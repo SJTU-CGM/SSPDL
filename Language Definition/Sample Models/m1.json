@@ -1,0 +1,100 @@
+{
+    "namespace": {
+        "E1": {
+            "kind": "motif",
+            "color": "#ABCDEF",
+            "matrix": [
+                {
+                    "A": 1,
+                    "C": 0.0,
+                    "G": 0.0,
+                    "T": 0.0
+                },
+                {
+                    "A": 0.25,
+                    "C": 0.25,
+                    "G": 0.0,
+                    "T": 0.5
+                },
+                {
+                    "A": 0.5,
+                    "C": 0.1,
+                    "G": 0.2,
+                    "T": 0.2
+                }
+            ]
+        },
+        "E2": {
+            "kind": "g-motif",
+            "distribution": { "from": 0, "probs": [ 0.25, 0.5, 0.25 ] },
+            "color": "#ff00ff",
+            "matrix": [
+                {
+                    "A": 0.25,
+                    "C": 0.25,
+                    "G": 0.0,
+                    "T": 0.5
+                },
+                {
+                    "A": 0.5,
+                    "C": 0.1,
+                    "G": 0.2,
+                    "T": 0.2
+                },
+                {
+                    "A": 1,
+                    "C": 0.0,
+                    "G": 0.0,
+                    "T": 0.0
+                }
+            ]
+        },
+        "S1": {
+            "kind": "spacer",
+            "distribution": { "from": 0, "probs": [ 0.2, 0.3, 0.4, 0.1 ] }
+        }
+    },
+    "root": [
+        {
+            "kind": "repetition",
+            "prob": 0.5,
+            "sub": [
+                {
+                    "kind": "element",
+                    "name": "E1"
+                },
+                {
+                    "kind": "element",
+                    "name": "S1"
+                },
+                {
+                    "kind": "element",
+                    "name": "E2"
+                }
+            ]
+        },
+        {
+            "kind": "alternation",
+            "psubs": [
+                {
+                    "prob": 0.6,
+                    "mod": [
+                        {
+                            "kind": "element",
+                            "name": "E2"
+                        }
+                    ]
+                },
+                {
+                    "prob": 0.4,
+                    "mod": [
+                        {
+                            "kind": "element",
+                            "name": "E1"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
