@@ -1,0 +1,53 @@
+html, body {
+    width: 100%;
+    height: 100%;
+    padding: 0px;
+    margin: 0px;
+}
+
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+
+#main {
+    overflow-y: hidden;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+
+#menu {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    background-color: lightgray;
+}
+
+
+#viewer-wrapper {
+    overflow: auto;
+    height: 30%;
+    flex-grow: 1;
+    /*! display: flex; */
+}
+
+
+#namespace-viewer {
+    height: 50%;
+    flex-grow: 1;
+    border-top: 1px solid black;
+}
+
+
+#namespace-viewer > div:first-child {
+    border-right: 1px solid grey;
+}
+
+#namespace-viewer > div:nth-last-child(1) {
+    flex-grow: 2;
+    overflow-y: auto;
+}
