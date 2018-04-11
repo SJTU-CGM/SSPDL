@@ -951,6 +951,7 @@ class ElementEditor extends Widget_1.Editor {
                 }
             }
         };
+        console.log(this.data);
         return {
             name: this.nameEd.getData(),
             def: getDef()
@@ -2370,7 +2371,7 @@ class NamespaceViewer extends Widget_1.Controller {
     // displayData(container: HTMLElement, data: { ns: Namespace; elem: string; }): void {
     displayData(container, data) {
         const names = Object.keys(data).sort();
-        if (this.focus) {
+        if (this.focus && data[this.focus]) {
             this.nameListViewer.setData(names);
             this.elementEditor.setData({
                 name: this.focus,

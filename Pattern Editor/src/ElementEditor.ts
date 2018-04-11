@@ -43,6 +43,7 @@ export class ElementEditor extends Editor<NamedElementDef> {
                 }
             }
         }
+        console.log(this.data);
         return {
             name: this.nameEd.getData(),
             def: getDef()

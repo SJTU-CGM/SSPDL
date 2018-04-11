@@ -243,7 +243,7 @@ class NamespaceViewer extends Controller<Namespace, NamespaceEditCmd> implements
     // displayData(container: HTMLElement, data: { ns: Namespace; elem: string; }): void {
     displayData(container: HTMLElement, data: Namespace) {
         const names = Object.keys(data).sort();
-        if (this.focus) {
+        if (this.focus && data[this.focus]) {
             this.nameListViewer.setData(names);
             this.elementEditor.setData({
                 name: this.focus,
