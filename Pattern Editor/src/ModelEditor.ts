@@ -602,7 +602,7 @@ export class ModelEditor extends Editor<Model> implements Controllee<ModuleEditC
         const item: ModuleItem = ((p < q)
             ? { kind: "alternation", psubs: [{ prob: 0.5, mod: piece }, { prob: 0.5, mod: [] }] }
             : { kind: "repetition", prob: 0.5, sub: piece });
-        module.splice(min(p, q), 0, item);
+        module.splice(min(p, q), Math.abs(p-q), item);
         return this.setData({
             namespace: data.namespace,
             root: root1

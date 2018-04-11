@@ -71,7 +71,7 @@
 /************************************************************************/
 /******/ ({
 
-/***/ "../../../../../../usr/local/lib/node_modules/webpack/buildin/amd-define.js":
+/***/ "../../../../../../usr/lib/node_modules/webpack/buildin/amd-define.js":
 /*!***************************************!*\
   !*** (webpack)/buildin/amd-define.js ***!
   \***************************************/
@@ -85,7 +85,7 @@ module.exports = function() {
 
 /***/ }),
 
-/***/ "../../../../../../usr/local/lib/node_modules/webpack/buildin/amd-options.js":
+/***/ "../../../../../../usr/lib/node_modules/webpack/buildin/amd-options.js":
 /*!****************************************!*\
   !*** (webpack)/buildin/amd-options.js ***!
   \****************************************/
@@ -638,7 +638,7 @@ var saveAs = saveAs || (function(view) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports.saveAs = saveAs;
-} else if (("function" !== "undefined" && __webpack_require__(/*! !webpack amd define */ "../../../../../../usr/local/lib/node_modules/webpack/buildin/amd-define.js") !== null) && (__webpack_require__(/*! !webpack amd options */ "../../../../../../usr/local/lib/node_modules/webpack/buildin/amd-options.js") !== null)) {
+} else if (("function" !== "undefined" && __webpack_require__(/*! !webpack amd define */ "../../../../../../usr/lib/node_modules/webpack/buildin/amd-define.js") !== null) && (__webpack_require__(/*! !webpack amd options */ "../../../../../../usr/lib/node_modules/webpack/buildin/amd-options.js") !== null)) {
   !(__WEBPACK_AMD_DEFINE_RESULT__ = (function() {
     return saveAs;
   }).call(exports, __webpack_require__, exports, module),
@@ -1581,7 +1581,7 @@ class ModelEditor extends Widget_1.Editor {
         const item = ((p < q)
             ? { kind: "alternation", psubs: [{ prob: 0.5, mod: piece }, { prob: 0.5, mod: [] }] }
             : { kind: "repetition", prob: 0.5, sub: piece });
-        module.splice(JSUtility_1.min(p, q), 0, item);
+        module.splice(JSUtility_1.min(p, q), Math.abs(p - q), item);
         return this.setData({
             namespace: data.namespace,
             root: root1
