@@ -5,12 +5,17 @@ import { Model } from "./SMDL/SMDL";
 import { HTML } from "./html";
 
 
-requestResource("GET", "./etc/sample_module.json", "json", (mod: Model) => {
-    const editor = new ModelEditor(HTML.ref("main"));
-    editor.setData(mod);
+// requestResource("GET", "./etc/sample_module.json", "json", (mod: Model) => {
+//     const editor = new ModelEditor(HTML.ref("main"));
+//     editor.setData(mod);
+// });
+
+
+const editor = new ModelEditor(HTML.ref("main"));
+editor.setData({
+    namespace: {},
+    root: []
 });
-
-
 
 // animation example
 

@@ -3263,12 +3263,16 @@ exports.HTML = HTML;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const requestResource_1 = __webpack_require__(/*! ./utility/requestResource */ "./src/utility/requestResource.ts");
 const ModelEditor_1 = __webpack_require__(/*! ./ModelEditor */ "./src/ModelEditor.ts");
 const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-requestResource_1.requestResource("GET", "./etc/sample_module.json", "json", (mod) => {
-    const editor = new ModelEditor_1.ModelEditor(html_1.HTML.ref("main"));
-    editor.setData(mod);
+// requestResource("GET", "./etc/sample_module.json", "json", (mod: Model) => {
+//     const editor = new ModelEditor(HTML.ref("main"));
+//     editor.setData(mod);
+// });
+const editor = new ModelEditor_1.ModelEditor(html_1.HTML.ref("main"));
+editor.setData({
+    namespace: {},
+    root: []
 });
 // animation example
 // const s = Snap("#example");
@@ -3416,49 +3420,6 @@ function requestFile(callback) {
     inputElement.click();
 }
 exports.requestFile = requestFile;
-
-
-/***/ }),
-
-/***/ "./src/utility/requestResource.ts":
-/*!****************************************!*\
-  !*** ./src/utility/requestResource.ts ***!
-  \****************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-function translateResourceType(type) {
-    let mapping = {
-        "bin": "arraybuffer",
-        "xml": "document",
-        "html": "document",
-        "json": "json",
-        "text": "text"
-    };
-    return mapping[type];
-}
-function requestResource(method, URL, resourceType, handle) {
-    let request = new XMLHttpRequest();
-    request.open(method, URL);
-    request.onreadystatechange = function () {
-        if (this.readyState == XMLHttpRequest.DONE) {
-            if (request.status !== 200) {
-                console.log(request);
-                throw Error();
-            }
-            else {
-                let response = (resourceType === "bin") ? new Uint8Array(request.response) : request.response;
-                handle(response);
-            }
-        }
-    };
-    request.responseType = translateResourceType(resourceType);
-    request.send();
-}
-exports.requestResource = requestResource;
 
 
 /***/ }),
