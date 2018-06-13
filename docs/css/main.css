@@ -1,53 +1,38 @@
 html, body {
+    margin: 0;
     width: 100%;
     height: 100%;
-    padding: 0px;
-    margin: 0px;
 }
 
 
-body {
-    display: flex;
-    flex-direction: column;
+button {
+    font-family: Monospace;
+    background-color: white;
+    padding: 0.5em 1em;
+    border: 1px solid grey;
 }
 
 
-#main {
-    overflow-y: hidden;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
+button:hover {
+    box-shadow: 0px  0px 3px 0px grey inset;
 }
 
 
-#menu {
-    position: sticky;
-    top: 0;
+* {
+    box-sizing: border-box;
+    font-family:  sans-serif;
+}
+
+span {
+    white-space: pre;
+}
+
+
+label {
+    display: block;
+}
+
+
+table input {
     width: 100%;
-    background-color: lightgray;
-}
-
-
-#viewer-wrapper {
-    overflow: auto;
-    height: 30%;
-    flex-grow: 1;
-    /*! display: flex; */
-}
-
-
-#namespace-viewer {
-    height: 50%;
-    flex-grow: 1;
-    border-top: 1px solid black;
-}
-
-
-#namespace-viewer > div:first-child {
-    border-right: 1px solid grey;
-}
-
-#namespace-viewer > div:nth-last-child(1) {
-    flex-grow: 2;
-    overflow-y: auto;
 }
