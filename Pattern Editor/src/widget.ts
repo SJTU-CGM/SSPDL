@@ -1,5 +1,5 @@
 import { Paper } from "snapsvg";
-import { min, dummy } from "./utility/JSUtility";
+import { min, dummy } from "./JSUtility";
 import Snap = require("snapsvg");
 
 export type HandlerGroup = {
@@ -79,20 +79,22 @@ export function InternalBox(paper: Paper, pathString: string, x: number, y: numb
 }
 
 
-export function SpacerBox(paper: Paper, label: string, pathString: string, width: number, height: number, handlerGroup: HandlerGroup) {
+export function SpacerBox(paper: Paper, label: string, pathString: string, x: number, y: number, width: number, height: number, handlerGroup: HandlerGroup) {
     paper = paper.g();
-    const r = paper.rect(0, 0, width, height).attr({
+    const r = paper.rect(x, y, width, height).attr({
         "stroke": "white",
         "fill": "white",
         "smdl-path": pathString
     });
-    const p = paper.path(Snap.format("M0,0 V{h} M{w},0 V{h}", {
-        "w": width,
-        "h": height
+    const p = paper.path(Snap.format("M{x1},{y} V{h} M{x2},{y} V{h}", {
+        "x1": x,
+        "x2": x + width,
+        "y": y,
+        "h": y + height
     })).attr({
         "pointer-events": "none"
     });
-    paper.text(width / 2, height / 2, label).attr({
+    paper.text(x + width / 2, y + height / 2, label).attr({
         "stroke": "black",
         "fill": "black",
         "text-anchor": "middle",
@@ -116,28 +118,32 @@ export function SpacerBox(paper: Paper, label: string, pathString: string, width
 }
 
 
-export function PWMBox(paper: Paper, label: string, color: string, pathString: string, width: number, height: number, handlerGroup: HandlerGroup) {
+export function PWMBox(paper: Paper, label: string, fillColor: string, pathString: string, x: number, y: number, width: number, height: number, handlerGroup: HandlerGroup) {
 
-    function bgdColorToLabelColor(color: string): string {
+    function fillToStroke(color: string): string {
         const clr = Snap.color(color);
         const lightness = clr.l;
         return (lightness < 0.5) ? "white" : "black";
     }
 
-    paper = paper.g();
+    paper = paper.g()
+    paper.transform(Snap.format("translate({x},{y})", {
+        "x": x,
+        "y": y
+    }));
+    const strokeColor = fillToStroke(fillColor);
     const r = paper.rect(0, 0, width, height, min(width / 3, height / 3)).attr({
-        "stroke": "none",
-        "fill": color,
+        "stroke": strokeColor,
+        "fill": fillColor,
         "smdl-path": pathString
     });
-    const labelColor = bgdColorToLabelColor(color);
     paper.text(width / 2, height / 2, label).attr({
-        "stroke": labelColor,
-        "fill": labelColor,
+        "stroke": strokeColor,
+        "fill": strokeColor,
         "text-anchor": "middle",
         "dominant-baseline": "central",
         "pointer-events": "none",
-        "font-size": height * 0.6
+        "font-size": height * 0.5 + "px"
     });
     registerHandlers(paper, handlerGroup);
     r.hover(
@@ -148,7 +154,7 @@ export function PWMBox(paper: Paper, label: string, color: string, pathString: s
         },
         () => {
             r.attr({
-                "stroke": "none"
+                "stroke": strokeColor
             })
         }
     )

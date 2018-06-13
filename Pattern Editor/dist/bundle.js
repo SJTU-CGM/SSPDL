@@ -66,7 +66,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = "./src/index.ts");
+/******/ 	return __webpack_require__(__webpack_require__.s = "./src/index.tsx");
 /******/ })
 /************************************************************************/
 /******/ ({
@@ -648,45 +648,262 @@ if (typeof module !== "undefined" && module.exports) {
 
 /***/ }),
 
-/***/ "./src/DistributionEditor.ts":
-/*!***********************************!*\
-  !*** ./src/DistributionEditor.ts ***!
-  \***********************************/
+/***/ "./src/CSV.ts":
+/*!********************!*\
+  !*** ./src/CSV.ts ***!
+  \********************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const StringEditor_1 = __webpack_require__(/*! ./Widget/StringEditor */ "./src/Widget/StringEditor.ts");
-const Button_1 = __webpack_require__(/*! ./Widget/Button */ "./src/Widget/Button.ts");
-const Pile_1 = __webpack_require__(/*! ./Widget/Pile */ "./src/Widget/Pile.ts");
-const Snap = __webpack_require__(/*! snapsvg */ "snapsvg");
-const JSUtility_1 = __webpack_require__(/*! ./utility/JSUtility */ "./src/utility/JSUtility.ts");
-const svg_1 = __webpack_require__(/*! ./utility/svg */ "./src/utility/svg.ts");
-const Utility_1 = __webpack_require__(/*! ./Widget/Utility */ "./src/Widget/Utility.ts");
+var CSV;
+(function (CSV) {
+    function parseField(f) {
+        f = f.trim();
+        if (parseFloat(f) !== NaN) {
+            return parseFloat(f);
+        }
+        else {
+            return f;
+        }
+    }
+    function parse(txt) {
+        const lines = txt.trim().split("\n");
+        const header = lines[0];
+        const fieldNames = header.split(',');
+        const lineToRecord = (line) => {
+            const fields = line.split(',');
+            const record = {};
+            fieldNames.forEach((fn, i) => {
+                record[fn] = parseField(fields[i]);
+            });
+            return record;
+        };
+        return {
+            head: fieldNames,
+            body: lines.slice(1).map(lineToRecord)
+        };
+    }
+    CSV.parse = parse;
+    function dump(csv) {
+        const lines = [];
+        // head
+        lines.push(csv.head.join(','));
+        // body
+        for (const r of csv.body) {
+            const fields = [];
+            for (const fn of csv.head) {
+                fields.push(r[fn]);
+            }
+            lines.push(fields.join(','));
+        }
+        return lines.join('\n');
+    }
+    CSV.dump = dump;
+})(CSV = exports.CSV || (exports.CSV = {}));
+
+
+/***/ }),
+
+/***/ "./src/Components/BackgroundDistributionEditor.tsx":
+/*!*********************************************************!*\
+  !*** ./src/Components/BackgroundDistributionEditor.tsx ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const Utility_1 = __webpack_require__(/*! ../Widget/Utility */ "./src/Widget/Utility.tsx");
+const NumberEditor_1 = __webpack_require__(/*! ../Widget/NumberEditor */ "./src/Widget/NumberEditor.tsx");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
+class BackgroundDistributionEditor extends Widget_1.Editor {
+    makeContainer() {
+        return (JSXFactory.createElement("div", { style: {
+                "border-bottom": "1px solid black",
+                "display": "flex",
+                "flex-direction": "row",
+                "padding-left": "0.5ex",
+                "padding-right": "0.5ex"
+            } }));
+    }
+    displayData(data, minor) {
+        const alphabet = minor.alphabet;
+        const content = alphabet.map((code) => {
+            return (JSXFactory.createElement("span", null,
+                JSXFactory.createElement("strong", null, code),
+                ": ",
+                data[code],
+                "; "));
+        });
+        const btn = JSXFactory.createElement("span", { style: { "color": "blue", cursor: "pointer" } }, "Edit");
+        JSXFactory.render(this.getDOM(), (JSXFactory.createElement("span", null, "Background Distribution: ")), JSXFactory.createElement("span", { style: { "flex-grow": "1" } }, content), btn);
+        btn.addEventListener("click", () => {
+            const ed = new BEditor();
+            ed.initData(data, minor);
+            Utility_1.ask(ed, {
+                cancel: () => { },
+                ok: () => {
+                    const d = ed.getMajorData();
+                    if (JSUtility_1.sum(...alphabet.map((code) => d[code])) === 1) {
+                        this.updateMajorData(ed.getMajorData());
+                    }
+                    else {
+                        alert("Invalid background distribution");
+                    }
+                }
+            });
+        });
+    }
+}
+exports.BackgroundDistributionEditor = BackgroundDistributionEditor;
+class BEditor extends Widget_1.Editor {
+    makeContainer() { return JSXFactory.createElement("table", null); }
+    displayData(data, minor) {
+        const alphabet = minor.alphabet;
+        // create editors
+        const editorTable = {};
+        for (const code of alphabet) {
+            editorTable[code] = new NumberEditor_1.NumberEditor();
+        }
+        // build dom
+        const doms = [];
+        for (const code of alphabet) {
+            doms.push(JSXFactory.createElement("tr", null,
+                JSXFactory.createElement("td", null, code),
+                JSXFactory.createElement("td", null, editorTable[code].getDOM())));
+        }
+        const header = JSXFactory.createElement("tr", null,
+            JSXFactory.createElement("th", null, "Code"),
+            JSXFactory.createElement("th", null, "Probability"));
+        JSXFactory.render(this.getDOM(), header, ...doms);
+        // initialize data
+        for (const code of alphabet) {
+            const ed = editorTable[code];
+            ed.initData(data[code], {
+                min: 0,
+                max: 1,
+                step: 0.001
+            });
+        }
+        // others
+        this.editorTable = editorTable;
+    }
+    getMajorData() {
+        const dist = {};
+        for (const code of Object.keys(this.editorTable)) {
+            dist[code] = this.editorTable[code].getMajorData();
+        }
+        return dist;
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/Components/DefinitionViewer.tsx":
+/*!*********************************************!*\
+  !*** ./src/Components/DefinitionViewer.tsx ***!
+  \*********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+class DefinitionViewer extends Widget_1.Controller {
+    displayData(data) {
+        if (data === null) {
+            JSXFactory.render(this.getDOM());
+        }
+        else {
+            const renameButton = JSXFactory.createElement("button", { style: { "margin-right": "1em" } }, "Rename");
+            const deleteButton = JSXFactory.createElement("button", null, "Delete");
+            if (data.useless) {
+                deleteButton.disabled = true;
+                deleteButton.title = "You cannot delete this element, because it's currently in use.";
+            }
+            renameButton.addEventListener("click", () => {
+                const newName = prompt("A new name");
+                if (newName !== null && newName.length > 0) {
+                    this.send({
+                        kind: "rename-def",
+                        oldName: data.name,
+                        newName: newName
+                    });
+                }
+            });
+            deleteButton.addEventListener("click", () => {
+                this.send({
+                    kind: "delete-def",
+                    name: data.name
+                });
+            });
+            JSXFactory.render(this.getDOM(), JSXFactory.createElement("div", { style: {
+                    "display": "flex", "flex-direction": "row", "border-bottom": "1px solid grey",
+                    "padding-top": "0.5ex",
+                    "padding-bottom": "0.5ex"
+                } },
+                JSXFactory.createElement("span", { style: {
+                        "flex-grow": "1",
+                        "display": "flex",
+                        "align-items": "center",
+                        "justify-content": "center",
+                        "font-weight": "bold"
+                    } }, data.name),
+                renameButton,
+                deleteButton));
+        }
+    }
+}
+exports.DefinitionViewer = DefinitionViewer;
+
+
+/***/ }),
+
+/***/ "./src/Components/DistributionEditor.tsx":
+/*!***********************************************!*\
+  !*** ./src/Components/DistributionEditor.tsx ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const Button_1 = __webpack_require__(/*! ../Widget/Button */ "./src/Widget/Button.tsx");
+const Pile_1 = __webpack_require__(/*! ../Widget/Pile */ "./src/Widget/Pile.tsx");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
+const Utility_1 = __webpack_require__(/*! ../Widget/Utility */ "./src/Widget/Utility.tsx");
+const DistributionViewer_1 = __webpack_require__(/*! ./DistributionViewer */ "./src/Components/DistributionViewer.tsx");
+const NumberEditor_1 = __webpack_require__(/*! ../Widget/NumberEditor */ "./src/Widget/NumberEditor.tsx");
+const CSV_1 = __webpack_require__(/*! ../CSV */ "./src/CSV.ts");
+const Wrapper_1 = __webpack_require__(/*! ../Widget/Wrapper */ "./src/Widget/Wrapper.tsx");
 class DistributionEditor extends Widget_1.Editor {
     init() {
-        this.viewer = new DViewer();
-        this.editor = new DEditor();
-        html_1.HTML.b({
-            p: this.getDOM(),
-            ch: [
-                "Distribution:",
-                this.viewer.getDOM()
-            ]
-        });
+        this.viewer = new DistributionViewer_1.DistributionViewer();
+        JSXFactory.render(this.getDOM(), this.viewer.getDOM());
         this.viewer.bind({
             handle: (cmd) => {
-                Utility_1.confirm(this.editor, {
+                const ed = new DEditor();
+                ed.initData(this.getMajorData(), undefined);
+                Utility_1.ask(ed, {
                     ok: () => {
-                        const newData = this.editor.getData();
-                        if (newData.probs.every((n) => { return 0 <= n && n <= 1; }) && JSUtility_1.sum(...newData.probs) === 1) {
-                            this.viewer.setData(this.editor.getData());
+                        const newData = ed.getMajorData();
+                        if (newData.probs.every((n) => { return 0 <= n && n <= 1; }) && JSUtility_1.floatEqual(JSUtility_1.sum(...newData.probs), 1)) {
+                            this.updateMajorData(newData);
                         }
                         else {
+                            console.log(newData);
                             alert("invalid distribution: either some probability is out of [0,1] or their sum does not equal to 1.");
                         }
                     },
@@ -696,29 +913,154 @@ class DistributionEditor extends Widget_1.Editor {
             }
         });
     }
-    getData() {
+    getMajorData() {
         return this.viewer.getData();
     }
-    displayData(container, data) {
-        this.viewer.setData(data);
-        this.editor.setData(data);
+    displayData(data) {
+        this.viewer.initData(data);
     }
 }
 exports.DistributionEditor = DistributionEditor;
-class DViewer extends Widget_1.Controller {
+class DEditor extends Widget_1.Editor {
     init() {
         super.init();
-        this.svg = svg_1.SVG.svg({
-            "stroke": "black",
-            "fill": "white"
+    }
+    makeContainer() {
+        return JSXFactory.createElement("div", { style: { "display": "flex", "flex-direction": "column" } });
+    }
+    getMajorData() {
+        return {
+            from: this.fromEr.getMajorData(),
+            probs: this.probsEr.getMajorData()
+        };
+    }
+    displayData(data) {
+        this.fromEr = new NumberEditor_1.NumberEditor();
+        this.fromEr.initData(data.from, {
+            min: 1,
+            step: 1
         });
-        this.paper = Snap(this.svg);
-        html_1.HTML.inner(this.getDOM(), [this.svg]);
+        this.fromEr.register(this, (d) => {
+            this.probsEr.updateMinorData({
+                from: d
+            });
+        });
+        this.probsEr = new ProbsEditor();
+        this.probsEr.initData(data.probs, {
+            from: data.from
+        });
+        let csvButton = JSXFactory.createElement("button", null, "To/From CSV");
+        csvButton.addEventListener("click", () => {
+            let probs = this.probsEr.getMajorData();
+            let csvText = CSV_1.CSV.dump({ head: ["Pr"], body: probs.map((p) => ({ "Pr": p })) });
+            const textarea = JSXFactory.createElement("textarea", { cols: "30", rows: "10" });
+            textarea.value = csvText;
+            Utility_1.ask(new Wrapper_1.Wrapper(textarea), {
+                cancel: () => { },
+                ok: () => {
+                    let tab = CSV_1.CSV.parse(textarea.value);
+                    if (JSUtility_1.equal(tab.head, ["Pr"])) {
+                        let probs = tab.body.map((r) => (r["Pr"]));
+                        this.probsEr.updateMajorData(probs);
+                    }
+                }
+            });
+        });
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("label", { style: { "margin-bottom": "1ex" } },
+            "From: ",
+            this.fromEr.getDOM()), this.probsEr.getDOM(), csvButton);
+    }
+}
+class ProbsEditor extends Widget_1.Editor {
+    constructor() {
+        super(...arguments);
+        this.editors = [];
+    }
+    handle(cmd) {
+        switch (cmd.message) {
+            case "add-row": {
+                const data = this.getMajorData();
+                this.updateMajorData([...data, 0]);
+                return;
+            }
+            case "del-row": {
+                const data = this.getMajorData();
+                this.updateMajorData((data.length > 0) ? data.slice(0, data.length - 1) : []);
+                return;
+            }
+        }
+    }
+    makeContainer() {
+        return JSXFactory.createElement("div", { style: { "display": "flex", "flex-direction": "column" } });
+    }
+    init() {
+        super.init();
+        this.addRowButton = new Button_1.Button();
+        this.addRowButton.initData({
+            label: "+",
+            message: "add-row"
+        });
+        this.addRowButton.bind(this);
+        this.delRowButton = new Button_1.Button();
+        this.delRowButton.initData({
+            label: "-",
+            message: "del-row"
+        });
+        this.delRowButton.bind(this);
+    }
+    getMajorData() {
+        return this.editors.map((e) => { return e.getMajorData(); });
+    }
+    displayData(data, minor) {
+        this.editors = [];
+        for (let i = 0; i < data.length; i++) {
+            const ed = new NumberEditor_1.NumberEditor();
+            ed.initData(data[i], {
+                min: 0,
+                max: 1,
+                step: 0.001
+            });
+            this.editors.push(ed);
+        }
+        const pile = new Pile_1.HPile();
+        pile.setChildren([this.addRowButton, this.delRowButton]);
+        JSXFactory.render(this.getDOM(), ...this.editors.map((e, i) => (JSXFactory.createElement("label", null,
+            minor.from + i,
+            ": ",
+            e.getDOM()))), JSXFactory.createElement("div", { style: { "padding-top": "1ex" } }, pile.getDOM()));
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/Components/DistributionViewer.tsx":
+/*!***********************************************!*\
+  !*** ./src/Components/DistributionViewer.tsx ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/SVGFactory */ "./src/JSX/SVGFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
+class DistributionViewer extends Widget_1.Controller {
+    init() {
+        super.init();
+        this.svg = (JSXFactory.createElement("svg", { height: "0", width: "0", style: {
+                "stroke": "black",
+                "fill": "white"
+            } }));
         this.svg.addEventListener("click", () => {
             this.send("click");
         });
+        this.getDOM().innerHTML = "";
+        this.getDOM().appendChild(this.svg);
     }
-    displayData(container, data) {
+    displayData(data) {
         const contentHeight = 100;
         const unitWidth = 30;
         const topPadding = 20;
@@ -728,375 +1070,658 @@ class DViewer extends Widget_1.Controller {
         const height = contentHeight + topPadding + bottomPadding;
         const heightProbRatio = contentHeight / Math.max(0, ...data.probs);
         const width = leftPadding + unitWidth * data.probs.length + rightPadding;
-        svg_1.SVG.attr(this.svg, {
-            "width": width,
-            "height": height
-        });
-        svg_1.SVG.build({
-            p: this.svg,
-            ch: [
-                ...data.probs.map((p, i) => {
-                    const index = data.from + i;
-                    const h = p * heightProbRatio;
-                    const w = unitWidth;
-                    const top = topPadding + contentHeight;
-                    const left = leftPadding + unitWidth * i;
-                    return svg_1.SVG.build({
-                        p: {
-                            tag: "g",
-                            attr: {
-                                "transform": JSUtility_1.format("translate(%,%)", left, top)
-                            }
-                        },
-                        ch: [
-                            {
-                                tag: "rect",
-                                attr: {
-                                    "x": 0, "y": -h, "width": w, "height": h,
-                                    "fill": "lightblue",
-                                    "stroke": "white"
-                                }
-                            },
-                            {
-                                p: {
-                                    tag: "text",
-                                    attr: {
-                                        "x": unitWidth / 2, "y": -h,
-                                        "fill": "black",
-                                        "stroke": "black",
-                                        "dominant-baseline": "baseline",
-                                        "text-anchor": "middle",
-                                        "pointer-events": "none",
-                                        "font-size": "0.8em"
-                                    }
-                                },
-                                ch: [p.toFixed(3)]
-                            },
-                            {
-                                p: {
-                                    tag: "text",
-                                    attr: {
-                                        "x": unitWidth / 2, "y": 0,
-                                        "fill": "black",
-                                        "stroke": "black",
-                                        "dominant-baseline": "hanging",
-                                        "text-anchor": "middle",
-                                        "pointer-events": "none"
-                                    }
-                                },
-                                ch: [index]
-                            }
-                        ]
+        this.svg.setAttribute('width', width.toString());
+        this.svg.setAttribute('height', height.toString());
+        JSXFactory.render(this.svg, ...data.probs.map((p, i) => {
+            const index = data.from + i;
+            const h = p * heightProbRatio;
+            const w = unitWidth;
+            const top = topPadding + contentHeight;
+            const left = leftPadding + unitWidth * i;
+            const label = p.toFixed(2);
+            return (JSXFactory.createElement("g", { transform: JSUtility_1.format("translate(%,%)", left, top) },
+                JSXFactory.createElement("rect", { x: 0, y: -h, width: w, height: h, fill: "lightblue", stroke: "white" }),
+                JSXFactory.createElement("text", { x: unitWidth / 2, y: -h, fill: "black", stroke: "black", "dominant-baseline": "baseline", "text-anchor": "middle", "pointer-events": "none", "font-size": "0.6em" }, label),
+                JSXFactory.createElement("text", { x: unitWidth / 2, y: 0, fill: "black", stroke: "black", "dominant-baseline": "hanging", "text-anchor": "middle", "pointer-events": "none" }, index)));
+        }), JSXFactory.createElement("line", { x1: 0, y1: topPadding + contentHeight, x2: width, y2: topPadding + contentHeight, stroke: "black", fill: "black" }));
+    }
+}
+exports.DistributionViewer = DistributionViewer;
+
+
+/***/ }),
+
+/***/ "./src/Components/ElementDefEditor.tsx":
+/*!*********************************************!*\
+  !*** ./src/Components/ElementDefEditor.tsx ***!
+  \*********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const SSPDL_1 = __webpack_require__(/*! ../SSPDL/SSPDL */ "./src/SSPDL/SSPDL.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const MotifEditor_1 = __webpack_require__(/*! ./MotifEditor */ "./src/Components/MotifEditor.tsx");
+const SpacerEditor_1 = __webpack_require__(/*! ./SpacerEditor */ "./src/Components/SpacerEditor.tsx");
+class ElementDefEditor extends Widget_1.Editor {
+    displayData(data, extra) {
+        const makeEditor = (def, alphabet, background) => {
+            switch (def.kind) {
+                case SSPDL_1.ElementKind.Motif: {
+                    // editor
+                    const ed = new MotifEditor_1.MotifEditor();
+                    ed.initData(def, {
+                        alphabet: alphabet,
+                        background: background
                     });
-                }),
-                {
-                    tag: "line",
-                    attr: {
-                        "x1": 0, "y1": topPadding + contentHeight, "x2": width, "y2": topPadding + contentHeight,
-                        "stroke": "black",
-                        "fill": "black"
-                    }
+                    ed.register(this, (newMotif) => {
+                        const data = {
+                            kind: SSPDL_1.ElementKind.Motif,
+                            color: newMotif.color,
+                            matrix: newMotif.matrix
+                        };
+                        this.updateMajorData(data);
+                    });
+                    return ed;
                 }
-            ]
-        });
-    }
-}
-class DEditor extends Widget_1.Editor {
-    init() {
-        super.init();
-        this.fromInput = html_1.HTML.e({
-            tag: "input",
-            attr: {
-                "type": "number",
-                "step": "1",
-                "min": "0"
+                case SSPDL_1.ElementKind.GMotif: {
+                    // editor
+                    const ed = new MotifEditor_1.GMotifEditor();
+                    ed.initData(def, {
+                        alphabet: alphabet,
+                        background: background
+                    });
+                    ed.register(this, (newGMotif) => {
+                        const data = {
+                            kind: SSPDL_1.ElementKind.GMotif,
+                            color: newGMotif.color,
+                            matrix: newGMotif.matrix,
+                            distribution: newGMotif.distribution
+                        };
+                        this.updateMajorData(data);
+                    });
+                    return ed;
+                }
+                case SSPDL_1.ElementKind.Spacer: {
+                    // editor
+                    const ed = new SpacerEditor_1.SpacerEditor();
+                    ed.initData(def, undefined);
+                    ed.register(this, (newSpacer) => {
+                        const data = {
+                            kind: SSPDL_1.ElementKind.Spacer,
+                            distribution: newSpacer.distribution
+                        };
+                        this.updateMajorData(data);
+                    });
+                    return ed;
+                }
+                default: {
+                    throw new Error("internal");
+                }
             }
-        });
-        this.fromInput.addEventListener("change", () => {
-            this.probsEr.setData(Object.assign({}, this.probsEr.getData(), {
-                "from": parseInt(this.fromInput.value)
-            }));
-        });
-        this.probsEr = new ProbsEditor();
-        html_1.HTML.b({
-            p: this.getDOM(),
-            ch: [
-                {
-                    p: {
-                        tag: "label"
-                    },
-                    ch: [
-                        "From",
-                        this.fromInput
-                    ]
-                },
-                this.probsEr.getDOM()
-            ]
-        });
-    }
-    getData() {
-        return this.probsEr.getData();
-    }
-    displayData(container, data) {
-        this.fromInput.value = data.from + "";
-        this.probsEr.setData(data);
-    }
-}
-class ProbsEditor extends Widget_1.Editor {
-    handle(cmd) {
-        switch (cmd.message) {
-            case "add-row": {
-                const data = this.getData();
-                this.setData({
-                    from: data.from,
-                    probs: [...data.probs, 0]
-                });
-                return;
-            }
-            case "del-row": {
-                const data = this.getData();
-                this.setData({
-                    from: data.from,
-                    probs: (data.probs.length > 0) ? data.probs.slice(0, data.probs.length - 1) : []
-                });
-                return;
-            }
+        };
+        if (data === null) {
+            JSXFactory.render(this.getDOM());
         }
+        else {
+            const ed = makeEditor(data, extra.alphabet, extra.background);
+            JSXFactory.render(this.getDOM(), JSXFactory.createElement("div", { style: { "padding-left": "1em", "padding-top": "1ex" } }, ed.getDOM()));
+        }
+    }
+}
+exports.ElementDefEditor = ElementDefEditor;
+
+
+/***/ }),
+
+/***/ "./src/Components/IndexViewer.tsx":
+/*!****************************************!*\
+  !*** ./src/Components/IndexViewer.tsx ***!
+  \****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const SSPDL_1 = __webpack_require__(/*! ../SSPDL/SSPDL */ "./src/SSPDL/SSPDL.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const Box_1 = __webpack_require__(/*! ../SVGComponents/Box */ "./src/SVGComponents/Box.tsx");
+class IndexViewer extends Widget_1.Controller {
+    makeContainer() {
+        return (JSXFactory.createElement("div", { style: {
+                "flex-grow": "0",
+                "width": "10em",
+                "display": "flex",
+                "flex-direction": "column",
+                "flex-shrink": "0"
+            } }));
     }
     init() {
-        super.init();
-        this.addRowButton = new Button_1.Button();
-        this.addRowButton.setData({
-            label: "+",
-            message: "add-row"
-        });
-        this.addRowButton.bind(this);
-        this.delRowButton = new Button_1.Button();
-        this.delRowButton.setData({
-            label: "-",
-            message: "del-row"
-        });
-        this.delRowButton.bind(this);
-    }
-    getData() {
-        return {
-            from: this.data.from,
-            probs: this.editors.map((e) => { return parseFloat(e.getData()); })
-        };
-    }
-    displayData(container, data) {
-        const len = data.probs.length;
-        this.editors = [];
-        for (let i = 0; i < len; i++) {
-            this.editors.push(new StringEditor_1.StringEditor());
-        }
-        for (let i = 0; i < len; i++) {
-            this.editors[i].setData({
-                label: (data.from + i).toString(),
-                content: data.probs[i].toFixed(3)
+        const motifButton = JSXFactory.createElement("button", null, "New Motif");
+        const gmotifButton = JSXFactory.createElement("button", null, "New G-Motif");
+        const spacerButton = JSXFactory.createElement("button", null, "New Spacer");
+        motifButton.addEventListener("click", () => {
+            this.send({
+                kind: "new-element",
+                elementKind: SSPDL_1.ElementKind.Motif
             });
-        }
-        const pile = new Pile_1.HPile();
-        pile.setChildren([this.addRowButton, this.delRowButton]);
-        html_1.HTML.b({
-            p: container,
-            ch: [...this.editors.map(e => e.getDOM()), pile.getDOM()]
         });
+        gmotifButton.addEventListener("click", () => {
+            this.send({
+                kind: "new-element",
+                elementKind: SSPDL_1.ElementKind.GMotif
+            });
+        });
+        spacerButton.addEventListener("click", () => {
+            this.send({
+                kind: "new-element",
+                elementKind: SSPDL_1.ElementKind.Spacer
+            });
+        });
+        JSXFactory.render(this.getDOM(), this.itemContainer = JSXFactory.createElement("div", { style: { "flex-grow": "1", "overflow-y": "auto" } }), motifButton, gmotifButton, spacerButton);
+    }
+    displayData(data) {
+        JSXFactory.render(this.itemContainer, ...data.map((x) => {
+            const box = Box_1.Box({
+                size: 10,
+                fill: (x.kind === SSPDL_1.ElementKind.Spacer) ? "white" : x.color,
+                stroke: (x.kind === SSPDL_1.ElementKind.Spacer) ? "black" : x.color,
+            });
+            const btn = (JSXFactory.createElement("button", { style: {
+                    'display': "flex",
+                    "flex-direction": "row",
+                    'width': "100%"
+                } },
+                JSXFactory.createElement("span", { style: { "flex-grow": "0" } }, box),
+                JSXFactory.createElement("span", { style: { "flex-grow": "1" } }, x.name),
+                JSXFactory.createElement("span", { style: { "flex-grow": "0" } },
+                    "(",
+                    x.useCount,
+                    ")")));
+            btn.addEventListener("click", () => {
+                this.send({
+                    kind: "focus",
+                    name: x.name
+                });
+            });
+            return btn;
+        }));
     }
 }
+exports.IndexViewer = IndexViewer;
 
 
 /***/ }),
 
-/***/ "./src/ElementEditor.ts":
-/*!******************************!*\
-  !*** ./src/ElementEditor.ts ***!
-  \******************************/
+/***/ "./src/Components/ModelEditor.tsx":
+/*!****************************************!*\
+  !*** ./src/Components/ModelEditor.tsx ***!
+  \****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const StringEditor_1 = __webpack_require__(/*! ./Widget/StringEditor */ "./src/Widget/StringEditor.ts");
-const MotifEditor_1 = __webpack_require__(/*! ./MotifEditor */ "./src/MotifEditor.ts");
-const SpacerEditor_1 = __webpack_require__(/*! ./SpacerEditor */ "./src/SpacerEditor.ts");
-class ElementEditor extends Widget_1.Editor {
-    constructor(container) {
-        super(container);
-        this.nameEd = new StringEditor_1.StringEditor(html_1.HTML.box());
-        this.motifEd = new MotifEditor_1.MotifEditor(html_1.HTML.box());
-        this.gmotifEd = new MotifEditor_1.GMotifEditor(html_1.HTML.box());
-        this.spacerEd = new SpacerEditor_1.SpacerEditor(html_1.HTML.box());
-        this.gmotifEd.getDOM().style.display = "none";
-        this.motifEd.getDOM().style.display = "none";
-        this.spacerEd.getDOM().style.display = "none";
-        html_1.HTML.inner(container, [
-            this.nameEd.getDOM(), this.motifEd.getDOM(), this.gmotifEd.getDOM(), this.spacerEd.getDOM()
-        ]);
-    }
-    getData() {
-        const getDef = () => {
-            switch (this.data.def.kind) {
-                case "motif": {
-                    return Object.assign(this.motifEd.getData(), { kind: "motif" });
-                }
-                case "g-motif": {
-                    return Object.assign(this.gmotifEd.getData(), { kind: "g-motif" });
-                }
-                case "spacer": {
-                    return Object.assign(this.spacerEd.getData(), { kind: "spacer" });
-                }
-            }
-        };
-        console.log(this.data);
-        return {
-            name: this.nameEd.getData(),
-            def: getDef()
-        };
-    }
-    displayData(container, data) {
-        this.nameEd.setData({
-            label: "Name",
-            content: data.name
-        });
-        const def = data.def;
-        switch (def.kind) {
-            case "motif": {
-                this.motifEd.getDOM().style.display = "unset";
-                this.gmotifEd.getDOM().style.display = "none";
-                this.spacerEd.getDOM().style.display = "none";
-                this.motifEd.setData({
-                    color: def.color,
-                    matrix: def.matrix
-                });
-                return;
-            }
-            case "g-motif": {
-                this.motifEd.getDOM().style.display = "none";
-                this.gmotifEd.getDOM().style.display = "unset";
-                this.spacerEd.getDOM().style.display = "none";
-                this.gmotifEd.setData({
-                    distribution: def.distribution,
-                    color: def.color,
-                    matrix: def.matrix
-                });
-                return;
-            }
-            case "spacer": {
-                // spacer
-                this.motifEd.getDOM().style.display = "none";
-                this.gmotifEd.getDOM().style.display = "none";
-                this.spacerEd.getDOM().style.display = "unset";
-                this.spacerEd.setData({
-                    distribution: def.distribution
-                });
-                return;
-            }
-        }
-    }
-}
-exports.ElementEditor = ElementEditor;
-
-
-/***/ }),
-
-/***/ "./src/Menubar.ts":
-/*!************************!*\
-  !*** ./src/Menubar.ts ***!
-  \************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-class Menubar extends Widget_1.Controller {
-    displayData(container, data) {
-        const buildMenu = (menu) => {
-            const box = html_1.HTML.element("div", {}, {
-                "display": "inline-block"
-            });
-            const first = html_1.HTML.element("div", {
-                "class": "w3-button"
-            }, {
-                "cursor": "pointer",
-                "position": "relative",
-                "padding": "0.2em 1em"
-            }, [menu.name]);
-            const second = html_1.HTML.element("div", {}, {
-                "position": "absolute",
-                "display": "none",
-                "background-color": "white",
-                "box-shadow": "0px 8px 16px 0px rgba(0,0,0,0.2)"
-            }, menu.content.map((s) => {
-                const sec = html_1.HTML.element("div", {
-                    "class": "w3-button"
-                }, {
-                    "display": "block",
-                    "cursor": "pointer",
-                    "padding": "0.2em 1em"
-                }, [s]);
-                sec.addEventListener("click", () => {
-                    this.send({
-                        kind: "menu",
-                        firstLevel: menu.name,
-                        secondLevel: s
-                    });
-                });
-                return sec;
-            }));
-            html_1.HTML.inner(box, [first, second]);
-            box.addEventListener("mouseenter", () => {
-                second.style.display = "block";
-            });
-            box.addEventListener("mouseleave", () => {
-                second.style.display = "none";
-            });
-            return box;
-        };
-        html_1.HTML.inner(container, data.map(buildMenu));
-    }
-}
-exports.Menubar = Menubar;
-
-
-/***/ }),
-
-/***/ "./src/ModelEditor.ts":
-/*!****************************!*\
-  !*** ./src/ModelEditor.ts ***!
-  \****************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const ModuleViewer_1 = __webpack_require__(/*! ./ModuleViewer */ "./src/ModuleViewer.ts");
-const Utility_1 = __webpack_require__(/*! ./SMDL/Utility */ "./src/SMDL/Utility.ts");
-const JSUtility_1 = __webpack_require__(/*! ./utility/JSUtility */ "./src/utility/JSUtility.ts");
-const NamespaceViewer_1 = __webpack_require__(/*! ./NamespaceViewer */ "./src/NamespaceViewer.ts");
-const Menubar_1 = __webpack_require__(/*! ./Menubar */ "./src/Menubar.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const Utility_2 = __webpack_require__(/*! ./Widget/Utility */ "./src/Widget/Utility.ts");
-const Pile_1 = __webpack_require__(/*! ./Widget/Pile */ "./src/Widget/Pile.ts");
-const StringEditor_1 = __webpack_require__(/*! ./Widget/StringEditor */ "./src/Widget/StringEditor.ts");
-const Button_1 = __webpack_require__(/*! ./Widget/Button */ "./src/Widget/Button.ts");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const ModuleViewer_1 = __webpack_require__(/*! ./ModuleViewer */ "./src/Components/ModuleViewer.tsx");
+const Utility_1 = __webpack_require__(/*! ../SSPDL/Utility */ "./src/SSPDL/Utility.ts");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
+const StringViewer_1 = __webpack_require__(/*! ../Widget/StringViewer */ "./src/Widget/StringViewer.tsx");
+const Menubar_1 = __webpack_require__(/*! ../Widget/Menubar */ "./src/Widget/Menubar.tsx");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const SSPDL_1 = __webpack_require__(/*! ../SSPDL/SSPDL */ "./src/SSPDL/SSPDL.ts");
+const Utility_2 = __webpack_require__(/*! ../Widget/Utility */ "./src/Widget/Utility.tsx");
+const Pile_1 = __webpack_require__(/*! ../Widget/Pile */ "./src/Widget/Pile.tsx");
+const Button_1 = __webpack_require__(/*! ../Widget/Button */ "./src/Widget/Button.tsx");
 const FileSaver = __webpack_require__(/*! file-saver */ "./node_modules/file-saver/FileSaver.js");
+const NumberEditor_1 = __webpack_require__(/*! ../Widget/NumberEditor */ "./src/Widget/NumberEditor.tsx");
+const BackgroundDistributionEditor_1 = __webpack_require__(/*! ./BackgroundDistributionEditor */ "./src/Components/BackgroundDistributionEditor.tsx");
+const Wrapper_1 = __webpack_require__(/*! ../Widget/Wrapper */ "./src/Widget/Wrapper.tsx");
+const IndexViewer_1 = __webpack_require__(/*! ./IndexViewer */ "./src/Components/IndexViewer.tsx");
+const DefinitionViewer_1 = __webpack_require__(/*! ./DefinitionViewer */ "./src/Components/DefinitionViewer.tsx");
+const ElementDefEditor_1 = __webpack_require__(/*! ./ElementDefEditor */ "./src/Components/ElementDefEditor.tsx");
+const CSV_1 = __webpack_require__(/*! ../CSV */ "./src/CSV.ts");
+class ProbabilityEditor extends NumberEditor_1.NumberEditor {
+    initData(data, extra = { min: 0, max: 1, step: 0.001 }) {
+        super.initData(data, extra);
+    }
+}
 class ModelEditor extends Widget_1.Editor {
-    constructor(container) {
-        super(container);
+    constructor() {
+        super(...arguments);
         this.undoCount = 0;
         this.undoStack = [];
         this.redoStack = [];
-        const menubar = new Menubar_1.Menubar(html_1.HTML.ref("menu"));
-        menubar.setData([
+    }
+    interpreteNewElement(elementKind) {
+        const model = this.getMajorData();
+        const namespace = model.namespace;
+        switch (elementKind) {
+            case SSPDL_1.ElementKind.Motif: {
+                const name = window.prompt("The name of new motif:");
+                if (name !== null && name.length > 0) {
+                    if (namespace[name] !== undefined) {
+                        alert("Duplicated definition for " + name);
+                    }
+                    else {
+                        namespace[name] = {
+                            kind: SSPDL_1.ElementKind.Motif,
+                            color: "#888888",
+                            matrix: []
+                        };
+                        this.updateMajorData(model);
+                        this.handle({
+                            kind: "focus",
+                            name: name
+                        });
+                    }
+                }
+                return;
+            }
+            case SSPDL_1.ElementKind.GMotif: {
+                const name = window.prompt("The name of new generalized motif:");
+                if (name !== null && name.length > 0) {
+                    if (namespace[name] !== undefined) {
+                        alert("Duplicated definition for " + name);
+                    }
+                    else {
+                        namespace[name] = {
+                            kind: SSPDL_1.ElementKind.GMotif,
+                            distribution: { from: 1, probs: [1] },
+                            color: "#000000",
+                            matrix: []
+                        };
+                        this.updateMajorData(model);
+                        this.handle({
+                            kind: "focus",
+                            name: name
+                        });
+                    }
+                }
+                return;
+            }
+            case SSPDL_1.ElementKind.Spacer: {
+                const name = window.prompt("The name of new spacer:");
+                if (name !== null && name.length > 0) {
+                    if (namespace[name] !== undefined) {
+                        alert("Duplicated definition for " + name);
+                    }
+                    else {
+                        namespace[name] = {
+                            kind: SSPDL_1.ElementKind.Spacer,
+                            distribution: { from: 1, probs: [1] },
+                        };
+                        this.updateMajorData(model);
+                        this.handle({
+                            kind: "focus",
+                            name: name
+                        });
+                    }
+                }
+                return;
+            }
+        }
+    }
+    interpreteFocus(name) {
+        const model = this.getMajorData();
+        if (model.namespace[name] !== undefined) {
+            let useless = false;
+            Utility_1.tranverseModule(model.root, (e) => {
+                if (e.name === name) {
+                    useless = true;
+                }
+            });
+            this.definitionViewer.initData({
+                name: name,
+                useless: useless
+            });
+            this.elementDefEr.initData(model.namespace[name], {
+                alphabet: model.alphabet,
+                background: model.background
+            });
+        }
+        else {
+            this.definitionViewer.initData(null);
+            this.elementDefEr.initData(null, {
+                alphabet: model.alphabet,
+                background: model.background
+            });
+        }
+    }
+    interpreteRenameDef(oldName, newName) {
+        const model = this.getMajorData();
+        if (model.namespace[newName] !== undefined) {
+            alert("The new name is already in use.");
+            return;
+        }
+        else {
+            model.namespace[newName] = model.namespace[oldName];
+            delete model.namespace[oldName];
+            model.root = Utility_1.transformModule(model.root, (e) => {
+                if (e.name === oldName) {
+                    return {
+                        name: newName
+                    };
+                }
+                else {
+                    return e;
+                }
+            });
+            this.updateMajorData(model);
+            this.handle({
+                kind: "focus",
+                name: newName
+            });
+            return;
+        }
+    }
+    handleUndo() {
+        if (this.undoStack.length > 0) {
+            this.redoStack.push(this.getMajorData());
+            this.updateMajorData(this.undoStack.pop());
+        }
+        else {
+            alert("no more undoable action");
+        }
+    }
+    handleRedo() {
+        if (this.redoStack.length > 0) {
+            this.undoStack.push(this.getMajorData());
+            this.updateMajorData(this.redoStack.pop());
+        }
+        else {
+            alert("no more redoable action");
+        }
+    }
+    handleNeitherUndoNorRedo() {
+        this.undoStack.push(this.getMajorData());
+        this.redoStack = [];
+    }
+    interpreteEditNode(path, index) {
+        const insertableElements = Object.keys(this.getMajorData().namespace);
+        const that = this;
+        const insertionControllee = new class {
+            handle(cmd) {
+                // insert element to node at *path*.
+                const model = that.getMajorData();
+                const rider = new Utility_1.StandardRider(model.root, path);
+                rider.getModule().splice(index, 0, {
+                    kind: "element",
+                    name: cmd.message
+                });
+                that.updateMajorData(model);
+                // close the popup
+                popupConrollee.handle({
+                    kind: "popup",
+                    command: "close"
+                });
+            }
+        };
+        const widget = new Pile_1.Pile();
+        widget.setChildren([
+            new Wrapper_1.Wrapper(JSXFactory.createElement("span", null, "You may insert one of the elements.")),
+            ...insertableElements.map((name) => {
+                const btn = new Button_1.Button();
+                btn.initData({
+                    label: name,
+                    message: name
+                });
+                btn.bind(insertionControllee);
+                return btn;
+            })
+        ]);
+        const popupConrollee = Utility_2.tell(widget, "Cancel");
+    }
+    interpreteEditElement(path) {
+        const widget = new StringViewer_1.StringViewer();
+        widget.initData("You may delete this element.");
+        Utility_2.popup(widget, [
+            { label: JSXFactory.createElement("span", { style: { "color": 'red' } }, "Delete"), key: "delete" },
+            { label: "Cancel", key: "cancel" }
+        ], {
+            delete: () => {
+                const data = this.getMajorData();
+                const rider = new Utility_1.StandardRider(data.root, path);
+                console.log(rider.getNodeKind(), rider, path);
+                // return;
+                rider.up();
+                rider.getModule().splice(path[path.length - 1], 1);
+                this.updateMajorData(data);
+                return;
+            },
+            cancel: () => { }
+        });
+    }
+    interpreteEditRepetition(path) {
+        class RepetetionEditor extends Widget_1.Editor {
+            init() {
+                this.editor = new ProbabilityEditor();
+                JSXFactory.render(this.getDOM(), JSXFactory.createElement("label", null,
+                    "Pr(looping back) = ",
+                    this.editor.getDOM()));
+            }
+            getMajorData() {
+                return this.editor.getMajorData();
+            }
+            displayData(data) {
+                this.editor.initData(data);
+            }
+        }
+        const data = JSUtility_1.copy(this.getMajorData());
+        const rider = new Utility_1.StandardRider(data.root, path);
+        const repet = rider.getRepetition();
+        const ed = new RepetetionEditor();
+        ed.initData(repet.prob, undefined);
+        Utility_2.popup(ed, [
+            { label: JSXFactory.createElement("span", { style: { "color": "green" } }, "Submit"), key: "submit" },
+            { label: JSXFactory.createElement("span", { style: { "color": "red" } }, "Delete"), key: "delete" },
+            { label: "Cancel", key: "cancel" }
+        ], {
+            "submit": () => {
+                const prob = ed.getMajorData();
+                if (0 <= prob && prob <= 1) {
+                    repet.prob = prob;
+                    this.updateMajorData(data);
+                }
+                else {
+                    alert("invalid probability");
+                }
+            },
+            "delete": () => {
+                const path = rider.getPath();
+                const index = path[path.length - 1];
+                rider.up();
+                const m = rider.getModule();
+                m.splice(index, 1);
+                this.updateMajorData(data);
+            },
+            "cancel": () => { }
+        });
+    }
+    interpreteEditAlternation(path) {
+        class AlternationEditor extends Widget_1.Editor {
+            handle(cmd) {
+                switch (cmd.message) {
+                    case 'add': {
+                        this.updateMajorData(this.getMajorData().concat([0]));
+                        return;
+                    }
+                    case 'del': {
+                        let d = this.getMajorData();
+                        this.updateMajorData(d.slice(0, d.length - 1));
+                        return;
+                    }
+                    case 'csv': {
+                        let d = this.getMajorData();
+                        let csvText = CSV_1.CSV.dump({
+                            head: ['Pr'],
+                            body: d.map((p) => ({ 'Pr': p }))
+                        });
+                        const textarea = JSXFactory.createElement("textarea", { cols: "30", rows: "10" });
+                        textarea.value = csvText;
+                        Utility_2.ask(new Wrapper_1.Wrapper(textarea), {
+                            ok: () => {
+                                const csv = CSV_1.CSV.parse(textarea.value);
+                                if (JSUtility_1.equal(csv.head, ['Pr'])) {
+                                    this.updateMajorData(csv.body.map((r) => (r['Pr'])));
+                                }
+                                else {
+                                    alert("You must not change the header.");
+                                }
+                            },
+                            cancel: () => { }
+                        });
+                        return;
+                    }
+                    default: {
+                        throw null;
+                    }
+                }
+            }
+            init() {
+                this.pile = new Pile_1.Pile();
+                JSXFactory.render(this.getDOM(), this.pile.getDOM());
+            }
+            displayData(data) {
+                this.editors = data.map((p) => {
+                    const ed = new ProbabilityEditor();
+                    ed.initData(p);
+                    return ed;
+                });
+                // add/delete row
+                const addRowBtn = new Button_1.Button();
+                const deleteRowBtn = new Button_1.Button();
+                addRowBtn.initData({
+                    label: "+",
+                    message: "add"
+                });
+                deleteRowBtn.initData({
+                    label: "-",
+                    message: "del"
+                });
+                addRowBtn.bind(this);
+                deleteRowBtn.bind(this);
+                let hp = new Pile_1.HPile();
+                hp.setChildren([addRowBtn, deleteRowBtn]);
+                // input/output as CSV
+                const ioBtn = new Button_1.Button();
+                ioBtn.initData({
+                    label: "To/From CSV",
+                    message: "csv"
+                });
+                ioBtn.bind(this);
+                this.pile.setChildren([
+                    ...this.editors.map((ed, i) => {
+                        return new Wrapper_1.Wrapper(JSXFactory.createElement("label", null,
+                            i.toString() + ": ",
+                            ed.getDOM()));
+                    }),
+                    hp, ioBtn
+                ]);
+            }
+            getMajorData() {
+                return this.editors.map((ed) => {
+                    return ed.getMajorData();
+                });
+            }
+        }
+        const module = JSUtility_1.copy(this.getMajorData());
+        const rider = new Utility_1.StandardRider(module.root, path);
+        const alter = rider.getAlternation();
+        const probs = alter.psubs.map(ps => ps.prob);
+        const ed = new AlternationEditor();
+        ed.initData(probs, undefined);
+        function validateDistribution(dist) {
+            let s = 0;
+            let i = 0;
+            for (let n of dist) {
+                if (typeof n != 'number') {
+                    throw Error('The ' + i + '-th item is not a number.');
+                }
+                if (!(0 <= n && n <= 1)) {
+                    throw Error('The ' + i + '-th number goes out of range 0~1 (' + n + ').');
+                }
+                s += n;
+                i++;
+            }
+            if (!JSUtility_1.floatEqual(s, 1)) {
+                throw Error('The sum of probability does not sum up to 1.');
+            }
+        }
+        Utility_2.popup(ed, [
+            { label: JSXFactory.createElement("span", { style: { "color": "green" } }, "Submit"), key: "submit" },
+            { label: JSXFactory.createElement("span", { style: { "color": "red" } }, "Delete"), key: "delete" },
+            { label: "Cancel", key: "cancel" }
+        ], {
+            "submit": () => {
+                const newDist = ed.getMajorData();
+                try {
+                    validateDistribution(newDist);
+                    let psubs = [];
+                    for (let i = 0; i < newDist.length; i++) {
+                        psubs.push({
+                            prob: newDist[i],
+                            mod: (i < alter.psubs.length) ? alter.psubs[i].mod : []
+                        });
+                    }
+                    alter.psubs = psubs;
+                    this.updateMajorData(module);
+                }
+                catch (e) {
+                    alert(e.message);
+                }
+            },
+            "delete": () => {
+                const path = rider.getPath();
+                const index = path[path.length - 1];
+                rider.up();
+                const m = rider.getModule();
+                m.splice(index, 1);
+                this.updateMajorData(module);
+            },
+            "cancel": () => { }
+        });
+    }
+    interpreteDeleteDef(name) {
+        let useless = true;
+        const model = this.getMajorData();
+        console.log(model, name);
+        Utility_1.tranverseModule(model.root, (e) => {
+            if (e.name === name) {
+                useless = false;
+            }
+        });
+        if (useless) {
+            delete model.namespace[name];
+            this.updateMajorData(model);
+            this.handle({
+                kind: "focus",
+                name: ""
+            });
+            return;
+        }
+        else {
+            alert("This element is still in use, so you cannot delete it.");
+            return;
+        }
+    }
+    makeContainer() {
+        return (JSXFactory.createElement("div", { style: {
+                display: "flex",
+                "flex-direction": "column",
+                height: "100%"
+            } }));
+    }
+    init() {
+        super.init();
+        const menubar = new Menubar_1.Menubar();
+        menubar.initData([
             {
                 name: "File",
                 content: ["New", "Load", "Save"]
@@ -1111,324 +1736,135 @@ class ModelEditor extends Widget_1.Editor {
             }
         ]);
         menubar.bind(this);
-        this.moduleVr = new ModuleViewer_1.ModuleViewer(html_1.HTML.ref("viewer-wrapper"));
+        this.moduleVr = new ModuleViewer_1.ModuleViewer();
         this.moduleVr.bind(this);
-        this.namespaceVr = new NamespaceViewer_1.NamespaceViewer(html_1.HTML.ref("namespace-viewer"));
-        this.namespaceVr.bind(this);
-        // HTML.inner(container, [ menubar.getContainer(), this.moduleVr.getContainer(), this.namespaceVr.getContainer() ]);
+        this.elementDefEr = new ElementDefEditor_1.ElementDefEditor();
+        this.elementDefEr.register(this, (def) => {
+            if (def !== null) {
+                const model = this.getMajorData();
+                const name = this.definitionViewer.getData().name;
+                model.namespace[name] = def;
+                this.updateMajorData(model);
+            }
+        });
+        this.definitionViewer = new DefinitionViewer_1.DefinitionViewer();
+        this.definitionViewer.bind(this);
+        this.indexViewer = new IndexViewer_1.IndexViewer();
+        this.indexViewer.bind(this);
+        this.backgroundEr = new BackgroundDistributionEditor_1.BackgroundDistributionEditor();
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("div", { style: { "flex-grow": "0" } }, menubar.getDOM()), JSXFactory.createElement("div", { style: { "flex-grow": "0" } }, this.backgroundEr.getDOM()), JSXFactory.createElement("div", { style: { "flex-grow": "1", "height": "30%", "overflow": "auto" } }, this.moduleVr.getDOM()), JSXFactory.createElement("div", { style: { "flex-grow": "1", "height": "50%" } },
+            JSXFactory.createElement("div", { style: {
+                    "display": "flex",
+                    "flex-direction": "row",
+                    "border-top": "1px solid black",
+                    "height": "100%"
+                } },
+                this.indexViewer.getDOM(),
+                JSXFactory.createElement("div", { style: {
+                        "flex-grow": "1",
+                        "border-left": "1px solid black",
+                        "overflow-y": "scroll"
+                    } },
+                    this.definitionViewer.getDOM(),
+                    this.elementDefEr.getDOM()))));
     }
-    handleUndo() {
-        if (this.undoStack.length > 0) {
-            this.redoStack.push(this.getData());
-            this.setData(this.undoStack.pop());
-        }
-        else {
-            alert("no more undoable action");
-        }
-    }
-    handleRedo() {
-        if (this.redoStack.length > 0) {
-            this.undoStack.push(this.getData());
-            this.setData(this.redoStack.pop());
-        }
-        else {
-            alert("no more redoable action");
-        }
-    }
-    handleNeitherUndoNorRedo() {
-        this.undoStack.push(this.getData());
-        this.redoStack = [];
-    }
-    interpreteEditNode(path, index) {
-        const model = this.getData();
-        let insertedElement = null;
-        const chooserHandler = new class {
-            handle(cmd) {
-                insertedElement = cmd.message;
-                popupHandler.handle("close");
-            }
-        };
-        const buttons = Object.keys(model.namespace).map((nm) => {
-            const b = new Button_1.Button();
-            b.setData({
-                label: nm,
-                message: nm
-            });
-            b.bind(chooserHandler);
-            return b;
-        });
-        const pile = new Pile_1.Pile();
-        pile.setChildren(buttons);
-        const popupHandler = Utility_2.popup(pile, {
-            onclose: () => {
-                if (insertedElement) {
-                    const rider = new Utility_1.StandardRider(model.root, path);
-                    rider.getModule().splice(index, 0, {
-                        kind: "element",
-                        name: insertedElement
-                    });
-                    this.setData(model);
-                }
-            }
-        });
-    }
-    interpreteEditElement(path) {
-        const deleteButton = new Button_1.Button();
-        let deleteFlag = false;
-        deleteButton.setData({
-            label: html_1.HTML.span("delete", { "color": "red" }),
-            message: "delete"
-        });
-        deleteButton.bind(new class {
-            handle(cmd) {
-                deleteFlag = true;
-                popupHandle.handle("close");
-            }
-        });
-        const popupHandle = Utility_2.popup(deleteButton, {
-            onclose: () => {
-                if (deleteFlag) {
-                    // delete Element
-                    const data = this.getData();
-                    const rider = new Utility_1.StandardRider(data.root, path);
-                    console.log(rider.getNodeKind(), rider, path);
-                    // return;
-                    rider.up();
-                    rider.getModule().splice(path[path.length - 1], 1);
-                    this.setData(data);
-                    return;
-                }
-            }
-        });
-    }
-    interpreteEditRepetition(path) {
-        class RepetetionEditor extends Widget_1.Editor {
-            init() {
-                this.editor = new StringEditor_1.StringEditor();
-                this.editor.registerHandler((data) => {
-                    this.emitDataChange();
-                });
-                html_1.HTML.b({
-                    p: this.getDOM(),
-                    ch: [this.editor.getDOM()]
-                });
-            }
-            setData(data) {
-                this.editor.setData(data.toFixed(3));
-            }
-            getData() {
-                return parseFloat(this.editor.getData());
-            }
-            displayData(container, data) {
-            }
-        }
-        const data = this.getData();
-        const rider = new Utility_1.StandardRider(data.root, path);
-        const repet = rider.getRepetition();
-        const ed = new RepetetionEditor();
-        ed.setData(repet.prob);
-        function validProb(p) {
-            return 0 <= p && p <= 1;
-        }
-        // delete button
-        const btn = new Button_1.Button();
-        let delFlag = false;
-        btn.setData({
-            label: html_1.HTML.e({
-                tag: "span",
-                style: {
-                    "color": "red"
-                },
-                ch: ["Delete"]
-            }),
-            message: "delete"
-        });
-        btn.bind(new class {
-            handle(cmd) {
-                delFlag = true;
-                popupHandle.handle("close");
-            }
-        });
-        const pile = new Pile_1.Pile();
-        pile.setChildren([ed, btn]);
-        const popupHandle = Utility_2.popup(pile, {
-            onclose: () => {
-                if (delFlag) {
-                    const path = rider.getPath();
-                    const index = path[path.length - 1];
-                    rider.up();
-                    const m = rider.getModule();
-                    m.splice(index, 1);
-                    this.setData(data);
+    displayData(data) {
+        function getElementUse(module) {
+            const elementUse = {};
+            const rider = new Utility_1.StandardRider(data.root);
+            function walk(rider) {
+                if (rider.isElement()) {
+                    const name = rider.getElementContent().name;
+                    elementUse[name] = (elementUse[name] || 0) + 1;
                 }
                 else {
-                    const prob_ = ed.getData();
-                    if (validProb(prob_)) {
-                        repet.prob = prob_;
-                        this.setData(data);
-                    }
-                    else {
-                        alert("invalid probability");
+                    for (const r of rider.getChildRiders()) {
+                        walk(r);
                     }
                 }
             }
-        });
-    }
-    interpreteEditAlternation(path) {
-        class AlternationProbsEditor extends Widget_1.Editor {
-            init() {
-                this.pile = new Pile_1.Pile();
-                html_1.HTML.b({
-                    p: this.getDOM(),
-                    ch: [this.pile.getDOM()]
-                });
-            }
-            displayData(container, data) {
-                this.editors = data.map((p) => {
-                    const ed = new StringEditor_1.StringEditor(html_1.HTML.box());
-                    ed.setData(p.toFixed(3));
-                    return ed;
-                });
-                this.pile.setChildren(this.editors);
-            }
-            getData() {
-                return this.editors.map((ed) => {
-                    return parseFloat(ed.getData());
-                });
-            }
+            walk(rider);
+            return elementUse;
         }
-        const data = this.getData();
-        const rider = new Utility_1.StandardRider(data.root, path);
-        const alter = rider.getAlternation();
-        const probs = alter.psubs.map(ps => ps.prob);
-        const ed = new AlternationProbsEditor(html_1.HTML.box());
-        ed.setData(probs);
-        function validDistribution(dist) {
-            return (dist.every(x => (x >= 0)) && JSUtility_1.sum(...dist) === 1);
-        }
-        const btn = new Button_1.Button();
-        let delFlag = false;
-        btn.setData({
-            label: html_1.HTML.e({
-                tag: "span",
-                style: {
-                    "color": "red"
-                },
-                ch: ["Delete"]
-            }),
-            message: "delete"
-        });
-        btn.bind(new class {
-            handle(cmd) {
-                delFlag = true;
-                popupHandle.handle("close");
-            }
-        });
-        const pile = new Pile_1.Pile();
-        pile.setChildren([ed, btn]);
-        const popupHandle = Utility_2.popup(pile, {
-            onclose: () => {
-                if (delFlag) {
-                    const path = rider.getPath();
-                    const index = path[path.length - 1];
-                    rider.up();
-                    const m = rider.getModule();
-                    m.splice(index, 1);
-                    this.setData(data);
-                }
-                else {
-                    const newDist = ed.getData();
-                    if (validDistribution(newDist)) {
-                        alter.psubs = JSUtility_1.zip2(alter.psubs, newDist).map((x) => {
-                            const [ps, p] = x;
-                            return {
-                                prob: p,
-                                mod: ps.mod
-                            };
-                        });
-                        this.setData({
-                            namespace: data.namespace,
-                            root: data.root
-                        });
-                        return;
-                    }
-                    else {
-                        alert("invalid distribution");
-                    }
-                }
-            }
-        });
-    }
-    interpreteDefineElement(name, def) {
-        const data = this.getData();
-        if (name.length === 0) {
-            alert("name too short");
-            return;
-        }
-        else if (name in data.namespace) {
-            alert("name conflict");
-            return;
-        }
-        else {
-            data.namespace[name] = def;
-            this.setData(data);
-            return;
-        }
-    }
-    interpreteRedefineElement(oldName, newName, def) {
-        function redef(ns, n1, n2, def) {
-            delete ns[n1];
-            ns[n2] = def;
-            return ns;
-        }
-        function rename(m, n1, n2) {
-            return Utility_1.transformModule(m, (e) => {
-                const nm = e.name === n1 ? n2 : e.name;
-                return {
-                    name: nm
-                };
-            });
-        }
-        const data = this.getData();
-        return this.setData({
-            namespace: redef(data.namespace, oldName, newName, def),
-            root: rename(data.root, oldName, newName)
-        });
-    }
-    displayData(container, data) {
-        this.moduleVr.setData(Utility_1.transformModule(data.root, (e) => {
+        this.alphabet = data.alphabet;
+        this.moduleVr.initData(Utility_1.transformModule(data.root, (e) => {
             const name = e.name;
             const elem = data.namespace[name];
             switch (elem.kind) {
-                case "motif": {
+                case SSPDL_1.ElementKind.Motif: {
                     return {
-                        type: "motif",
+                        type: SSPDL_1.ElementKind.Motif,
                         name: name,
                         color: elem.color,
                     };
                 }
-                case "g-motif": {
+                case SSPDL_1.ElementKind.GMotif: {
                     return {
-                        type: "g-motif",
+                        type: SSPDL_1.ElementKind.GMotif,
                         name: name,
                         dist: elem.distribution,
                         color: elem.color,
                     };
                 }
-                case "spacer": {
+                case SSPDL_1.ElementKind.Spacer: {
                     return {
-                        type: "spacer",
+                        type: SSPDL_1.ElementKind.Spacer,
                         name: name
                     };
                 }
+                default: {
+                    throw new Error();
+                }
             }
         }));
-        // this.namespaceVr.setData({ ns: data.namespace, elem: Object.keys(data.namespace)[0] })
-        this.namespaceVr.setData(data.namespace);
+        const elementUse = getElementUse(data.root);
+        const makeIndex = (data, alphabet, elementUse) => {
+            const index = [];
+            const makeIndexItem = (name, def) => {
+                switch (def.kind) {
+                    case "motif": {
+                        return {
+                            name: name,
+                            kind: SSPDL_1.ElementKind.Motif,
+                            color: def.color,
+                            useCount: elementUse[name] || 0
+                        };
+                    }
+                    case "g-motif": {
+                        return {
+                            name: name,
+                            kind: SSPDL_1.ElementKind.GMotif,
+                            color: def.color,
+                            useCount: elementUse[name] || 0
+                        };
+                    }
+                    case "spacer": {
+                        return {
+                            name: name,
+                            kind: SSPDL_1.ElementKind.Spacer,
+                            useCount: elementUse[name] || 0
+                        };
+                    }
+                    default: {
+                        throw new Error("internal");
+                    }
+                }
+            };
+            for (const name of Object.keys(data).sort()) {
+                index.push(makeIndexItem(name, data[name]));
+            }
+            return index;
+        };
+        this.indexViewer.initData(makeIndex(data.namespace, data.alphabet, elementUse));
+        this.backgroundEr.initData(data.background, {
+            alphabet: this.alphabet
+        });
+    }
+    getMajorData() {
+        return JSUtility_1.copy(super.getMajorData());
     }
     handle(cmd) {
-        console.log("ModelEditor", cmd);
-        if (cmd.kind === "menu") {
+        if (cmd.kind === "menubar") {
             const cmdString = cmd.firstLevel + "." + cmd.secondLevel;
             if (cmdString === "Edit.Undo") {
                 this.handleUndo();
@@ -1442,8 +1878,15 @@ class ModelEditor extends Widget_1.Editor {
                 this.handleNeitherUndoNorRedo();
                 switch (cmdString) {
                     case "File.New": {
-                        this.setData({
+                        const alphabet = "ACGT".split("");
+                        const bgd = {};
+                        for (const code of alphabet) {
+                            bgd[code] = 1 / alphabet.length;
+                        }
+                        this.updateMajorData({
                             namespace: {},
+                            background: bgd,
+                            alphabet: alphabet,
                             root: []
                         });
                         return;
@@ -1455,7 +1898,7 @@ class ModelEditor extends Widget_1.Editor {
                                 reader.addEventListener("load", () => {
                                     const text = reader.result;
                                     const json = JSON.parse(text);
-                                    this.setData(json);
+                                    this.updateMajorData(json);
                                 });
                                 reader.readAsText(file);
                             }
@@ -1463,7 +1906,7 @@ class ModelEditor extends Widget_1.Editor {
                         return;
                     }
                     case "File.Save": {
-                        const blob = new Blob([JSON.stringify(this.getData(), null, "\t")], { type: "text/plain;charset=utf-8" });
+                        const blob = new Blob([JSON.stringify(this.getMajorData(), null, "\t")], { type: "text/plain;charset=utf-8" });
                         FileSaver.saveAs(blob, "model.json");
                         return;
                     }
@@ -1477,9 +1920,6 @@ class ModelEditor extends Widget_1.Editor {
         else {
             this.handleNeitherUndoNorRedo();
             switch (cmd.kind) {
-                case "insp": {
-                    return this.interpreteInspect(cmd.path);
-                }
                 case "move": {
                     return this.interpreteMoveElementToNode(cmd.epath, cmd.mpath, cmd.mindex);
                 }
@@ -1501,11 +1941,17 @@ class ModelEditor extends Widget_1.Editor {
                 case "edit-node": {
                     return this.interpreteEditNode(cmd.path, cmd.index);
                 }
-                case "redef": {
-                    return this.interpreteRedefineElement(cmd.oldName, cmd.newName, cmd.def);
+                case "delete-def": {
+                    return this.interpreteDeleteDef(cmd.name);
                 }
-                case "define": {
-                    return this.interpreteDefineElement(cmd.name, cmd.def);
+                case "rename-def": {
+                    return this.interpreteRenameDef(cmd.oldName, cmd.newName);
+                }
+                case "focus": {
+                    return this.interpreteFocus(cmd.name);
+                }
+                case "new-element": {
+                    return this.interpreteNewElement(cmd.elementKind);
                 }
                 default: {
                     console.log(cmd);
@@ -1514,20 +1960,8 @@ class ModelEditor extends Widget_1.Editor {
             }
         }
     }
-    interpreteInspect(path) {
-        const r = new Utility_1.StandardRider(this.data.root, path);
-        const name = r.getElementContent().name;
-        // this.namespaceVr.setData({
-        //     ns: this.data.namespace,
-        //     elem: name
-        // })
-        this.namespaceVr.handle({
-            kind: "focus",
-            name: name
-        });
-    }
     interpreteMoveElementToNode(ePath, nPath, nindex) {
-        const root1 = this.getData().root;
+        const root1 = this.getMajorData().root;
         if (JSUtility_1.equal(ePath.slice(0, ePath.length - 1), nPath)) {
             // same parent
             const parentPath = nPath;
@@ -1546,13 +1980,12 @@ class ModelEditor extends Widget_1.Editor {
             rider.go(nPath);
             rider.getModule().splice(nindex, 0, e);
         }
-        this.setData({
-            namespace: this.data.namespace,
-            root: root1
-        });
+        const model = this.getMajorData();
+        model.root = root1;
+        this.updateMajorData(model);
     }
     interpreteCopyElementToNode(ePath, nPath, nindex) {
-        const data = this.getData();
+        const data = this.getMajorData();
         const root1 = data.root;
         if (JSUtility_1.equal(ePath.slice(0, ePath.length - 1), nPath)) {
             // same parent
@@ -1568,13 +2001,15 @@ class ModelEditor extends Widget_1.Editor {
             rider.go(nPath);
             rider.getModule().splice(nindex, 0, e);
         }
-        this.setData({
+        this.updateMajorData({
+            alphabet: this.alphabet,
             namespace: data.namespace,
+            background: data.background,
             root: root1
         });
     }
     interpreteLinkNodes(path, p, q) {
-        const data = this.getData();
+        const data = this.getMajorData();
         const root1 = data.root;
         const rider = new Utility_1.StandardRider(root1, path);
         const module = rider.getModule();
@@ -1583,8 +2018,10 @@ class ModelEditor extends Widget_1.Editor {
             ? { kind: "alternation", psubs: [{ prob: 0.5, mod: piece }, { prob: 0.5, mod: [] }] }
             : { kind: "repetition", prob: 0.5, sub: piece });
         module.splice(JSUtility_1.min(p, q), Math.abs(p - q), item);
-        return this.setData({
+        return this.updateMajorData({
+            alphabet: data.alphabet,
             namespace: data.namespace,
+            background: data.background,
             root: root1
         });
     }
@@ -1594,29 +2031,31 @@ exports.ModelEditor = ModelEditor;
 
 /***/ }),
 
-/***/ "./src/ModuleViewer.ts":
-/*!*****************************!*\
-  !*** ./src/ModuleViewer.ts ***!
-  \*****************************/
+/***/ "./src/Components/ModuleViewer.tsx":
+/*!*****************************************!*\
+  !*** ./src/Components/ModuleViewer.tsx ***!
+  \*****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const JSUtility_1 = __webpack_require__(/*! ./utility/JSUtility */ "./src/utility/JSUtility.ts");
+const JSXFactory = __webpack_require__(/*! ../JSX/SVGFactory */ "./src/JSX/SVGFactory.ts");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
 const Snap = __webpack_require__(/*! snapsvg */ "snapsvg");
-const widget_1 = __webpack_require__(/*! ./widget */ "./src/widget.ts");
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const Utility_1 = __webpack_require__(/*! ./SMDL/Utility */ "./src/SMDL/Utility.ts");
+const widget_1 = __webpack_require__(/*! ../widget */ "./src/widget.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const Utility_1 = __webpack_require__(/*! ../SSPDL/Utility */ "./src/SSPDL/Utility.ts");
 class ModuleViewer extends Widget_1.Controller {
-    constructor(container) {
-        super(container);
-        this.svg = html_1.HTML.ref("viewer");
+    init() {
+        super.init();
+        this.svg = JSXFactory.createElement("svg", { width: "0", height: "0" });
         this.paper = Snap(this.svg);
+        this.getDOM().innerHTML = "";
+        this.getDOM().appendChild(this.svg);
     }
-    displayData(container, data) {
+    displayData(data) {
         this.paper.clear();
         const go = renderModel(this.paper, data, {
             onDoubleClick: (path) => {
@@ -1802,48 +2241,85 @@ function renderModel(paper, m, hg) {
     }
     function renderElement(paper, rider) {
         const renderMotif = (p, name, color) => {
-            const w = 70;
-            const h = 30;
+            const totalWidth = 100;
+            const totalHeight = 50;
+            const elementWidgth = totalWidth;
+            const elementHeight = 30;
+            let [x, y, w, h] = [
+                (totalWidth - elementWidgth) / 2,
+                (totalHeight - elementHeight) / 2,
+                elementWidgth,
+                elementHeight
+            ];
             const path = {
                 kind: "element",
                 path: rider.getPath()
             };
-            widget_1.PWMBox(paper, name, color, JSON.stringify(path), w, h, profaneHandlerGroup(path));
+            widget_1.PWMBox(paper, name, color, JSON.stringify(path), x, y, w, h, profaneHandlerGroup(path));
             return {
-                a: h / 2,
-                d: h / 2,
-                w: w,
+                a: totalHeight / 2,
+                d: totalHeight / 2,
+                w: totalWidth,
                 node: paper
             };
         };
         const renderGMotif = (p, name, color) => {
-            const w = 100;
-            const h = 30;
+            const totalWidth = 100;
+            const totalHeight = 50;
+            const elementWidth = totalWidth;
+            const elementHeight = 30;
+            let [x, y, w, h] = [
+                (totalWidth - elementWidth) / 2,
+                (totalHeight - elementHeight) / 2,
+                elementWidth,
+                elementHeight
+            ];
             const path = {
                 kind: "element",
                 path: rider.getPath()
             };
-            widget_1.PWMBox(paper, name, color, JSON.stringify(path), w, h, profaneHandlerGroup(path));
-            // PWMBox(paper, name, color, JSON.stringify(path), w, h, profaneHandlerGroup(path));
+            widget_1.PWMBox(paper, name, color, JSON.stringify(path), x, y, w, h, profaneHandlerGroup(path));
             return {
-                a: h / 2,
-                d: h / 2,
-                w: w,
+                a: totalHeight / 2,
+                d: totalHeight / 2,
+                w: totalWidth,
                 node: paper
             };
+            // const w = 100;
+            // const h = 60;
+            // const path: UPath = {
+            //     kind: "element",
+            //     path: rider.getPath()
+            // };
+            // PWMBox(paper, name, color, JSON.stringify(path), 0, 15, w, 30, profaneHandlerGroup(path));
+            // // PWMBox(paper, name, color, JSON.stringify(path), w, h, profaneHandlerGroup(path));
+            // return {
+            //     a: h / 2,
+            //     d: h / 2,
+            //     w: w,
+            //     node: paper
+            // };
         };
         const renderSpacer = (p, name) => {
-            const w = 50;
-            const h = 15;
+            const totalWidth = 60;
+            const totalHeight = 30;
+            const elementWidth = 60;
+            const elementHeight = 20;
+            let [x, y, w, h] = [
+                (totalWidth - elementWidth) / 2,
+                (totalHeight - elementHeight) / 2,
+                elementWidth,
+                elementHeight
+            ];
             const path = {
                 kind: "element",
                 path: rider.getPath()
             };
-            widget_1.SpacerBox(paper, name, JSON.stringify(path), w, h, profaneHandlerGroup(path));
+            widget_1.SpacerBox(paper, name, JSON.stringify(path), x, y, w, h, profaneHandlerGroup(path));
             return {
-                a: h / 2,
-                d: h / 2,
-                w: w,
+                a: totalHeight / 2,
+                d: totalHeight / 2,
+                w: totalWidth,
                 node: paper
             };
         };
@@ -1863,10 +2339,11 @@ function renderModel(paper, m, hg) {
     function renderAlternation(paper, rider) {
         const leftPadding = 20;
         const rightPadding = 10;
-        const topPadding = 10;
-        const botPadding = 10;
-        const interModulePadding = 15;
-        const probLabelOffset = -3;
+        const topPadding = 5;
+        const botPadding = 5;
+        const interModulePadding = 5;
+        const probLabelOffsetY = -3;
+        const probLabelOffsetX = 3;
         const alter = rider.getAlternation();
         const subGOs = rider.getChildRiders().map((m) => renderModule(paper.g(), m));
         const subWidth = JSUtility_1.maxof(subGOs.map((go) => {
@@ -1905,7 +2382,7 @@ function renderModel(paper, m, hg) {
             return para.prob;
         });
         for (const para of subLayoutParas) {
-            pp.text(leftEnd, para.z + probLabelOffset, para.prob.toFixed(3));
+            pp.text(leftEnd + probLabelOffsetX, para.z + probLabelOffsetY, para.prob.toFixed(2));
         }
         const jointTop = subGOs[0].a + topPadding;
         const jointBot = totalHeight - subGOs[subGOs.length - 1].d - botPadding;
@@ -1928,45 +2405,49 @@ function renderModel(paper, m, hg) {
                 path: rider.getPath()
             });
         });
+        const jointMid = (jointTop + jointBot) / 2;
         return {
-            a: totalHeight / 2,
-            d: totalHeight / 2,
+            a: jointMid,
+            d: totalHeight - jointMid,
             w: totalWidth,
             node: paper
         };
     }
     function renderRepetition(paper, rider) {
-        const rep = rider.getRepetition();
         const arrowHeight = 20;
-        const padding = 5;
+        const horizontalPadding = 5;
+        const probLabelOffsetX = 3;
+        const rep = rider.getRepetition();
         const x = renderModule(paper.g(), rider.getChildRiders()[0]);
         x.node.transform(Snap.format("translate({x},{y})", {
-            "x": padding,
+            "x": horizontalPadding,
             "y": arrowHeight
         }));
         const pp = paper.g();
         // reverse arrow
         pp.path(Snap.format("M{x},{y} v-{h} h{w} v{h}", {
-            "x": padding / 2,
+            "x": horizontalPadding / 2,
             "y": x.a + arrowHeight,
             "h": x.a + arrowHeight / 2,
-            "w": x.w + padding
+            "w": x.w + horizontalPadding
         })).attr({
             "fill": "none"
         });
         // triangle
         pp.path(Snap.format("M{x},{y} l-5,-10 h10", {
-            "x": padding / 2,
-            "y": x.a + arrowHeight - padding / 2
+            "x": horizontalPadding / 2,
+            "y": x.a + arrowHeight - horizontalPadding / 2
         }));
         // dots
-        const dotRadius = padding / 2;
+        const dotRadius = horizontalPadding / 2;
         pp.circle(dotRadius, x.a + arrowHeight, dotRadius);
         pp.circle(x.w + dotRadius * 3, x.a + arrowHeight, dotRadius);
         // probability label
-        const labelX = x.w + dotRadius * 3;
-        const labelY = x.a + arrowHeight - 10;
-        pp.text(labelX, labelY, rep.prob.toFixed(3));
+        const labelX = x.w + dotRadius * 3 + probLabelOffsetX;
+        const labelY = (x.a + arrowHeight) - (x.a + arrowHeight / 2) / 2;
+        pp.text(labelX, labelY, rep.prob.toFixed(2)).attr({
+            "dominant-baseline": "central"
+        });
         pp.hover(() => {
             pp.attr({
                 "stroke": "blue",
@@ -1987,7 +2468,7 @@ function renderModel(paper, m, hg) {
         return {
             a: x.a + arrowHeight,
             d: x.d,
-            w: x.w + 2 * padding,
+            w: x.w + 2 * horizontalPadding,
             node: paper
         };
     }
@@ -1997,164 +2478,83 @@ function renderModel(paper, m, hg) {
 
 /***/ }),
 
-/***/ "./src/MotifEditor.ts":
-/*!****************************!*\
-  !*** ./src/MotifEditor.ts ***!
-  \****************************/
+/***/ "./src/Components/MotifEditor.tsx":
+/*!****************************************!*\
+  !*** ./src/Components/MotifEditor.tsx ***!
+  \****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const SeqLogo = __webpack_require__(/*! @baliga-lab/sequencelogo.js */ "./node_modules/@baliga-lab/sequencelogo.js/seqlogo.js");
-const ColorEditor_1 = __webpack_require__(/*! ./Widget/ColorEditor */ "./src/Widget/ColorEditor.ts");
-const DistributionEditor_1 = __webpack_require__(/*! ./DistributionEditor */ "./src/DistributionEditor.ts");
-class PWMEditor extends Widget_1.Editor {
-    displayData(container, data) {
-        const buildTable = (pwm) => {
-            const el = html_1.HTML.element("table", {
-                "class": "w3-table-all w3-centered"
-            });
-            el.addEventListener("input", () => {
-                this.emitDataChange();
-            });
-            const thEl = html_1.HTML.build({
-                p: html_1.HTML.element("tr"),
-                ch: ["A", "C", "G", "T"].map((n) => html_1.HTML.build({
-                    p: html_1.HTML.element("th"),
-                    ch: [n]
-                }))
-            });
-            const rows = [];
-            for (const r of pwm) {
-                rows.push(html_1.HTML.build({
-                    p: html_1.HTML.element("tr"),
-                    ch: [r.A, r.C, r.G, r.T].map((n) => html_1.HTML.build({
-                        p: html_1.HTML.element("td", {
-                            "contenteditable": "true"
-                        }),
-                        ch: [n.toFixed(3)]
-                    }))
-                }));
-            }
-            const addRowBtn = html_1.HTML.element("div", {
-                "class": "w3-button"
-            }, { "display": "block" }, ["+"]);
-            const delRowBtn = html_1.HTML.element("div", {
-                "class": "w3-button"
-            }, { "display": "block" }, ["-"]);
-            const buttonRow = html_1.HTML.element("tr", {}, {}, [
-                html_1.HTML.element("td", { "colspan": "2" }, { "padding": "0" }, [addRowBtn]),
-                html_1.HTML.element("td", { "colspan": "2" }, { "padding": "0" }, [delRowBtn]),
-            ]);
-            addRowBtn.addEventListener("click", () => {
-                const data = this.getData();
-                this.setData(data.concat([{
-                        A: 0.25,
-                        C: 0.25,
-                        G: 0.25,
-                        T: 0.25,
-                    }]));
-            });
-            delRowBtn.addEventListener("click", () => {
-                const data = this.getData();
-                this.setData(data.slice(0, data.length - 1));
-            });
-            return html_1.HTML.build({
-                p: el,
-                ch: [thEl].concat(rows, [buttonRow])
-            });
-        };
-        this.tableEl = buildTable(data);
-        html_1.HTML.inner(container, [this.tableEl]);
-    }
-    getData() {
-        const rows = this.tableEl.rows;
-        const pwm = [];
-        for (let i = 1; i < rows.length - 1; i++) {
-            // overlook header and button row
-            pwm.push({
-                A: parseFloat(rows[i].cells[0].innerText),
-                C: parseFloat(rows[i].cells[1].innerText),
-                G: parseFloat(rows[i].cells[2].innerText),
-                T: parseFloat(rows[i].cells[3].innerText)
-            });
-        }
-        return pwm;
-    }
-}
-class SeqLogoViewer extends Widget_1.Viewer {
-    constructor(container) {
-        super(container);
-        this.id = SeqLogoViewer.newID();
-        const logoEl = html_1.HTML.element("div", { "id": this.id });
-        html_1.HTML.inner(container, [logoEl]);
-    }
-    static newID() {
-        SeqLogoViewer.count++;
-        return "motif-viewer-canvas" + SeqLogoViewer.count.toString();
-    }
-    displayData(container, data) {
-        function transformMotif(pwm) {
-            return {
-                alphabet: ["A", "C", "G", "T"],
-                values: pwm.map((v) => [v.A, v.C, v.G, v.T])
-            };
-        }
-        SeqLogo.makeLogo(this.id, transformMotif(data), {});
-    }
-}
-SeqLogoViewer.count = 0;
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const ColorEditor_1 = __webpack_require__(/*! ../Widget/ColorEditor */ "./src/Widget/ColorEditor.tsx");
+const DistributionEditor_1 = __webpack_require__(/*! ./DistributionEditor */ "./src/Components/DistributionEditor.tsx");
+const PWMEditor_1 = __webpack_require__(/*! ./PWMEditor */ "./src/Components/PWMEditor.tsx");
 class MotifEditor extends Widget_1.Editor {
-    constructor(container) {
-        super(container);
-        this.colorEr = new ColorEditor_1.ColorEditor(html_1.HTML.box(), "Color");
-        this.pwmEr = new PWMEditor(html_1.HTML.box());
-        this.seqlogoVr = new SeqLogoViewer(html_1.HTML.box());
-        html_1.HTML.inner(container, [this.colorEr.getDOM(), "PWM:", this.pwmEr.getDOM(), this.seqlogoVr.getDOM()]);
-        this.pwmEr.registerHandler((data) => {
-            this.seqlogoVr.setData(data);
+    init() {
+        this.colorEr = new ColorEditor_1.ColorEditor();
+        this.pwmEr = new PWMEditor_1.PWMEditor();
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("label", null,
+            "Color: ",
+            this.colorEr.getDOM()), JSXFactory.createElement("label", null,
+            "PWM:",
+            this.pwmEr.getDOM()));
+        this.colorEr.register(this, (data) => {
+            this.emitDataChange();
+        });
+        this.pwmEr.register(this, (data) => {
+            this.emitDataChange();
         });
     }
-    displayData(container, data) {
-        this.colorEr.setData(data.color);
-        this.pwmEr.setData(data.matrix);
-        this.seqlogoVr.setData(data.matrix);
+    displayData(data, minor) {
+        this.colorEr.initData(data.color, undefined);
+        this.pwmEr.initData(data.matrix, {
+            alphabet: minor.alphabet,
+            background: minor.background
+        });
     }
-    getData() {
+    getMajorData() {
         return {
-            color: this.colorEr.getData(),
-            matrix: this.pwmEr.getData()
+            color: this.colorEr.getMajorData(),
+            matrix: this.pwmEr.getMajorData()
         };
     }
 }
 exports.MotifEditor = MotifEditor;
 class GMotifEditor extends Widget_1.Editor {
-    constructor(container) {
-        super(container);
+    init() {
+        super.init();
         this.distEr = new DistributionEditor_1.DistributionEditor();
-        this.colorEr = new ColorEditor_1.ColorEditor(html_1.HTML.box(), "Color");
-        this.pwmEr = new PWMEditor(html_1.HTML.box());
-        this.seqlogoVr = new SeqLogoViewer(html_1.HTML.box());
-        html_1.HTML.inner(container, [this.distEr.getDOM(), this.colorEr.getDOM(), "PWM:", this.pwmEr.getDOM(), this.seqlogoVr.getDOM()]);
-        this.pwmEr.registerHandler((data) => {
-            this.seqlogoVr.setData(data);
+        this.colorEr = new ColorEditor_1.ColorEditor();
+        this.pwmEr = new PWMEditor_1.PWMEditor();
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("label", null,
+            "Color: ",
+            this.colorEr.getDOM()), JSXFactory.createElement("label", null,
+            "PWM:",
+            this.pwmEr.getDOM()), JSXFactory.createElement("label", null,
+            "Distribution of #repetition:",
+            this.distEr.getDOM()));
+        const emitChange = () => this.emitDataChange();
+        this.distEr.register(this, emitChange);
+        this.colorEr.register(this, emitChange);
+        this.pwmEr.register(this, emitChange);
+    }
+    displayData(data, minor) {
+        this.distEr.initData(data.distribution, undefined);
+        this.colorEr.initData(data.color, undefined);
+        this.pwmEr.initData(data.matrix, {
+            alphabet: minor.alphabet,
+            background: minor.background
         });
     }
-    displayData(container, data) {
-        this.distEr.setData(data.distribution);
-        this.colorEr.setData(data.color);
-        this.pwmEr.setData(data.matrix);
-        this.seqlogoVr.setData(data.matrix);
-    }
-    getData() {
+    getMajorData() {
         return {
-            distribution: this.distEr.getData(),
-            color: this.colorEr.getData(),
-            matrix: this.pwmEr.getData()
+            distribution: this.distEr.getMajorData(),
+            color: this.colorEr.getMajorData(),
+            matrix: this.pwmEr.getMajorData()
         };
     }
 }
@@ -2163,9 +2563,400 @@ exports.GMotifEditor = GMotifEditor;
 
 /***/ }),
 
-/***/ "./src/NamespaceViewer.ts":
+/***/ "./src/Components/PWMEditor.tsx":
+/*!**************************************!*\
+  !*** ./src/Components/PWMEditor.tsx ***!
+  \**************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const Button_1 = __webpack_require__(/*! ../Widget/Button */ "./src/Widget/Button.tsx");
+const NumberEditor_1 = __webpack_require__(/*! ../Widget/NumberEditor */ "./src/Widget/NumberEditor.tsx");
+const Utility_1 = __webpack_require__(/*! ../Widget/Utility */ "./src/Widget/Utility.tsx");
+const JSUtility_1 = __webpack_require__(/*! ../JSUtility */ "./src/JSUtility.ts");
+const SeqLogo = __webpack_require__(/*! @baliga-lab/sequencelogo.js */ "./node_modules/@baliga-lab/sequencelogo.js/seqlogo.js");
+const CSV_1 = __webpack_require__(/*! ../CSV */ "./src/CSV.ts");
+const Wrapper_1 = __webpack_require__(/*! ../Widget/Wrapper */ "./src/Widget/Wrapper.tsx");
+const StringEditor_1 = __webpack_require__(/*! ../Widget/StringEditor */ "./src/Widget/StringEditor.tsx");
+class PEditor extends Widget_1.Editor {
+    handle(cmd) {
+        const handleFromConsensus = () => {
+            let ed = new StringEditor_1.StringEditor();
+            ed.initData("", undefined);
+            Utility_1.ask(ed, {
+                cancel: () => { },
+                ok: () => {
+                    let newData = [];
+                    let alphabet = this.getMinorData().alphabet;
+                    for (let ch of ed.getMajorData()) {
+                        let d = {};
+                        if (alphabet.indexOf(ch) >= 0) {
+                            for (let code of alphabet) {
+                                d[code] = (code == ch) ? 1 : 0;
+                            }
+                        }
+                        else {
+                            for (let code of alphabet) {
+                                d[code] = 1 / alphabet.length;
+                            }
+                        }
+                        newData.push(d);
+                    }
+                    this.updateMajorData(newData);
+                }
+            });
+        };
+        switch (cmd.message) {
+            case "add-row": {
+                const data = this.getMajorData();
+                this.updateMajorData(data.concat([JSUtility_1.copy(this.getMinorData().background)]));
+                return;
+            }
+            case "del-row": {
+                const data = this.getMajorData();
+                this.updateMajorData(data.slice(0, data.length - 1));
+                return;
+            }
+            case "csv": {
+                const alpha = this.getMinorData().alphabet;
+                const data = this.getMajorData();
+                const csvText = CSV_1.CSV.dump({ head: alpha, body: data });
+                const textarea = JSXFactory.createElement("textarea", { cols: "30", rows: "10" });
+                textarea.value = csvText;
+                Utility_1.ask(new Wrapper_1.Wrapper(textarea), {
+                    ok: () => {
+                        const csv = CSV_1.CSV.parse(textarea.value);
+                        console.log("ehhhh?", csv);
+                        if (JSUtility_1.equal(csv.head, alpha)) {
+                            this.updateMajorData(csv.body);
+                        }
+                        else {
+                            alert("You must not change the header.");
+                        }
+                    },
+                    cancel: () => { }
+                });
+                return;
+            }
+            case "consensus": {
+                handleFromConsensus();
+                return;
+            }
+        }
+    }
+    displayData(data, minor) {
+        // To/From CSV
+        const csvButton = new Button_1.Button();
+        csvButton.initData({
+            label: "To/From CSV",
+            message: "csv"
+        });
+        csvButton.bind(this);
+        // From Consensus
+        const cssButton = new Button_1.Button();
+        cssButton.initData({
+            label: "From consensus",
+            message: "consensus"
+        });
+        cssButton.bind(this);
+        // add/delete row
+        const addRowBtn = new Button_1.Button();
+        const deleteRowBtn = new Button_1.Button();
+        addRowBtn.initData({
+            label: "+",
+            message: "add-row"
+        });
+        deleteRowBtn.initData({
+            label: "-",
+            message: "del-row"
+        });
+        addRowBtn.bind(this);
+        deleteRowBtn.bind(this);
+        this.editorMaps = [];
+        for (const row of data) {
+            const editorMap = {};
+            for (const code of minor.alphabet) {
+                const e = new NumberEditor_1.NumberEditor();
+                e.initData(row[code], {
+                    min: 0,
+                    max: 1,
+                    step: 0.001
+                });
+                editorMap[code] = e;
+            }
+            this.editorMaps.push(editorMap);
+        }
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("div", null,
+            JSXFactory.createElement("table", null,
+                JSXFactory.createElement("tr", null, minor.alphabet.map((b) => (JSXFactory.createElement("th", { style: { width: "6em" } }, b)))),
+                this.editorMaps.map((table) => (JSXFactory.createElement("tr", null, minor.alphabet.map((code) => {
+                    return JSXFactory.createElement("td", { style: { width: "6em" } }, table[code].getDOM());
+                })))),
+                JSXFactory.createElement("tr", null,
+                    JSXFactory.createElement("td", { colspan: "2" }, addRowBtn.getDOM()),
+                    JSXFactory.createElement("td", { colspan: "2" }, deleteRowBtn.getDOM()))),
+            csvButton.getDOM(),
+            cssButton.getDOM()));
+    }
+    getMajorData() {
+        return this.editorMaps.map((table) => {
+            const d = {};
+            for (const code of Object.keys(table)) {
+                d[code] = table[code].getMajorData();
+            }
+            return d;
+        });
+    }
+}
+function validatePWM(alphabet, pwm) {
+    pwm.forEach((record, rowIndex) => {
+        let sum = 0;
+        for (const symbol of alphabet) {
+            const p = record[symbol];
+            if (!(0 <= p && p <= 1)) {
+                throw Error("The probability at (" + rowIndex + "," + symbol + ") out of range.");
+            }
+            sum += p;
+        }
+        if (!JSUtility_1.floatEqual(sum, 1)) {
+            throw Error("Row#" + (rowIndex + 1) + " sums up to " + sum + " (1 expected).");
+        }
+    });
+}
+class PWMEditor extends Widget_1.Editor {
+    init() {
+        super.init();
+        this.viewer = new SeqLogoViewer();
+        const content = JSXFactory.createElement("div", null, this.viewer.getDOM());
+        content.addEventListener("click", () => {
+            const ed = new PEditor();
+            ed.initData(this.getMajorData(), this.getMinorData());
+            Utility_1.ask(ed, {
+                ok: () => {
+                    const newData = ed.getMajorData();
+                    try {
+                        validatePWM(this.getMinorData().alphabet, newData);
+                        this.updateMajorData(newData);
+                    }
+                    catch (e) {
+                        alert("Invalid pwm: " + e.message);
+                    }
+                },
+                cancel: () => { }
+            });
+        });
+        JSXFactory.render(this.getDOM(), content);
+    }
+    displayData(data, minor) {
+        this.viewer.initData({
+            alphabet: minor.alphabet,
+            pwm: data
+        });
+    }
+}
+exports.PWMEditor = PWMEditor;
+class SeqLogoViewer extends Widget_1.Viewer {
+    static newID() {
+        SeqLogoViewer.count++;
+        return "motif-viewer-canvas" + SeqLogoViewer.count.toString();
+    }
+    init() {
+        super.init();
+        this.id = SeqLogoViewer.newID();
+        const logoEl = JSXFactory.createElement("div", { id: this.id });
+        JSXFactory.render(this.getDOM(), logoEl);
+    }
+    displayData(data) {
+        const transformMotif = (alphabet, pwm) => {
+            return {
+                alphabet: alphabet,
+                values: pwm.map((row) => alphabet.map((code) => row[code]))
+            };
+        };
+        JSUtility_1.later(() => {
+            SeqLogo.makeLogo(this.id, transformMotif(data.alphabet, data.pwm), {});
+        });
+    }
+}
+SeqLogoViewer.count = 0;
+
+
+/***/ }),
+
+/***/ "./src/Components/SpacerEditor.tsx":
+/*!*****************************************!*\
+  !*** ./src/Components/SpacerEditor.tsx ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Widget_1 = __webpack_require__(/*! ../Widget/Widget */ "./src/Widget/Widget.tsx");
+const DistributionEditor_1 = __webpack_require__(/*! ./DistributionEditor */ "./src/Components/DistributionEditor.tsx");
+;
+class SpacerEditor extends Widget_1.Editor {
+    init() {
+        super.init();
+        this.distEd = new DistributionEditor_1.DistributionEditor();
+        this.distEd.register(this, () => this.emitDataChange());
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("label", null,
+            "Length distribution: ",
+            this.distEd.getDOM()));
+    }
+    displayData(data) {
+        this.distEd.initData(data.distribution, undefined);
+    }
+    getMajorData() {
+        return {
+            distribution: this.distEd.getMajorData()
+        };
+    }
+}
+exports.SpacerEditor = SpacerEditor;
+
+
+/***/ }),
+
+/***/ "./src/JSUtility.ts":
+/*!**************************!*\
+  !*** ./src/JSUtility.ts ***!
+  \**************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const sum = (...nums) => {
+    let s = 0;
+    for (let n of nums) {
+        s += n;
+    }
+    return s;
+};
+exports.sum = sum;
+const max = Math.max;
+exports.max = max;
+const min = Math.min;
+exports.min = min;
+const maxof = (a) => max(...a);
+exports.maxof = maxof;
+const minof = (a) => min(...a);
+exports.minof = minof;
+const format = (temp, ...fill) => {
+    let result = "";
+    let i = 0;
+    let j = 0;
+    while (i < temp.length) {
+        if (temp[i] == "%") {
+            result += fill[j];
+            j++;
+            i++;
+        }
+        else {
+            result += temp[i];
+            i++;
+        }
+    }
+    return result;
+};
+exports.format = format;
+const later = (p) => {
+    setTimeout(p, 100);
+};
+exports.later = later;
+function assert(condition, message) {
+    if (!condition) {
+        message = message || "Assertion failed";
+        if (typeof Error !== "undefined") {
+            throw new Error(message);
+        }
+        throw message; // Fallback
+    }
+}
+exports.assert = assert;
+function dummy() {
+    return;
+}
+exports.dummy = dummy;
+function equal(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+exports.equal = equal;
+function enumerate(ls) {
+    const items = [];
+    for (const [i, x] of Array.from(ls).entries()) {
+        items.push({
+            i: i,
+            x: x
+        });
+    }
+    ;
+    return items;
+}
+exports.enumerate = enumerate;
+function zip2(ls0, ls1) {
+    const lim = min(ls0.length, ls1.length);
+    const ls = [];
+    for (let i = 0; i < lim; i++) {
+        ls.push([ls0[i], ls1[i]]);
+    }
+    return ls;
+}
+exports.zip2 = zip2;
+function zip(...ls) {
+    if (ls.length === 0) {
+        return [];
+    }
+    else {
+        const ls1 = ls[0];
+        const r = [];
+        for (let i = 0; i < ls1.length; i++) {
+            if (ls.every((l) => i < l.length)) {
+                r.push(ls.map(x => x[i]));
+            }
+            else {
+                break;
+            }
+        }
+        return r;
+    }
+}
+exports.zip = zip;
+function requestFile(callback) {
+    const inputElement = document.createElement("input");
+    inputElement.setAttribute("type", "file");
+    inputElement.addEventListener("change", () => {
+        const fileList = inputElement.files;
+        callback(fileList ? fileList[0] : null);
+    });
+    inputElement.click();
+}
+exports.requestFile = requestFile;
+function copy(x) {
+    return JSON.parse(JSON.stringify(x));
+}
+exports.copy = copy;
+function floatEqual(x, y) {
+    const delta = 1E-5;
+    return Math.abs(x - y) < delta;
+}
+exports.floatEqual = floatEqual;
+
+
+/***/ }),
+
+/***/ "./src/JSX/HTMLFactory.ts":
 /*!********************************!*\
-  !*** ./src/NamespaceViewer.ts ***!
+  !*** ./src/JSX/HTMLFactory.ts ***!
   \********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
@@ -2173,225 +2964,169 @@ exports.GMotifEditor = GMotifEditor;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const ElementEditor_1 = __webpack_require__(/*! ./ElementEditor */ "./src/ElementEditor.ts");
-class NameListViewer extends Widget_1.Controller {
-    displayData(container, data) {
-        html_1.HTML.inner(container, data.map((elem) => {
-            const e = html_1.HTML.element("div", {
-                "class": "w3-button"
-            }, {
-                "border-bottom": "1px solid grey"
-            }, [elem]);
-            e.addEventListener("click", () => {
-                this.send({
-                    kind: "focus",
-                    name: elem
-                });
-            });
-            return e;
-        }));
+function render(container, ...children) {
+    container.innerHTML = "";
+    for (const ch of children) {
+        container.appendChild(ch);
     }
 }
-class InspectorToolbar extends Widget_1.Controller {
-    displayData(container, data) {
-        html_1.HTML.inner(container, data.map((toolname) => {
-            const e = html_1.HTML.element("button", {
-                "class": "w3-button w3-border w3-small w3-teal"
-            }, {}, [toolname]);
-            e.addEventListener("click", () => {
-                this.send(toolname);
-            });
-            return e;
-        }));
+exports.render = render;
+function createElement(tag, attr, ...children) {
+    if (typeof tag === "function") {
+        const builder = tag;
+        const prop = attr;
+        return builder(attr);
     }
-}
-// class NamespaceViewer extends Controller<FocusableNamespace, NamespaceEditCmd> implements Controllee<string>, Controllee<FocusElement> {
-class NamespaceViewer extends Widget_1.Controller {
-    handleNewMotif() {
-        const defineMotif = (name) => {
-            const data = this.getData();
-            this.send({
-                kind: "define",
-                name: name,
-                def: {
-                    kind: "motif",
-                    color: "#ffffff",
-                    matrix: []
+    else {
+        const e = document.createElement(tag);
+        if (attr) {
+            for (const key of Object.keys(attr)) {
+                if (key === "id") {
+                    e.id = attr.id;
                 }
-            });
-        };
-        const name = window.prompt("The name of the new motif:");
-        if (name !== null) {
-            defineMotif(name);
+                else if (key === "class") {
+                    for (const cls of attr.class) {
+                        e.classList.add(cls);
+                    }
+                }
+                else if (key === "style") {
+                    const st = attr.style;
+                    const styleList = Object.keys(st).map((k) => ({
+                        name: k,
+                        value: st[k]
+                    }));
+                    const styleString = styleList.map((x) => (x.name + ":" + x.value + ";")).join("");
+                    e.setAttribute("style", styleString);
+                }
+                else {
+                    const a = attr;
+                    e.setAttribute(key, a[key]);
+                }
+            }
+            if (attr.style) {
+                const st = attr.style;
+                const styleList = Object.keys(st).map((k) => ({
+                    name: k,
+                    value: st[k]
+                }));
+                const styleString = styleList.map((x) => (x.name + ":" + x.value + ";")).join("");
+                e.setAttribute("style", styleString);
+            }
         }
-    }
-    handleNewGMotif() {
-        const defineMotif = (name) => {
-            const data = this.getData();
-            this.send({
-                kind: "define",
-                name: name,
-                def: {
-                    kind: "g-motif",
-                    distribution: { from: 0, probs: [1] },
-                    color: "#ffffff",
-                    matrix: []
+        if (children) {
+            for (const ch of children) {
+                if (typeof ch === "string" || typeof ch === 'number') {
+                    e.appendChild(document.createTextNode(ch));
                 }
-            });
-        };
-        const name = window.prompt("The name of the new g-motif:");
-        if (name !== null) {
-            defineMotif(name);
-        }
-    }
-    handleNewSpacer() {
-        const defineSpacer = (name) => {
-            const data = this.getData();
-            this.send({
-                kind: "define",
-                name: name,
-                def: {
-                    kind: "spacer",
-                    distribution: { from: 0, probs: [1] },
+                else if (ch instanceof Array) {
+                    for (const c of ch) {
+                        e.appendChild(c);
+                    }
                 }
-            });
-        };
-        const name = window.prompt("The name of the new spacer:");
-        if (name !== null) {
-            defineSpacer(name);
-        }
-    }
-    constructor(container) {
-        super(container);
-        container.setAttribute("style", html_1.HTML.style({
-            "display": "flex",
-            "flex-direction": "row"
-        }));
-        const nameListEl = html_1.HTML.element("div", {
-            "style": html_1.HTML.style({
-                "flex-grow": "2",
-                "width": "10em",
-                "display": "flex",
-                "flex-direction": "column"
-            })
-        });
-        const toolbarEl = html_1.HTML.element("div", {
-            "class": "w3-bar w3-teal"
-        }, {
-            "flex-shrink": "0",
-            "padding": "0.2em"
-        });
-        const elementEl = html_1.HTML.element("div", {}, {
-            "overflow-y": "scroll",
-            "flex-grow": "2"
-        });
-        const newMotifEl = html_1.HTML.element("div", {
-            "class": "w3-button w3-border"
-        }, {}, ["New Motif"]);
-        newMotifEl.addEventListener("click", () => {
-            this.handleNewMotif();
-        });
-        const newGMotifEl = html_1.HTML.element("div", {
-            "class": "w3-button w3-border"
-        }, {}, ["New G-Motif"]);
-        newGMotifEl.addEventListener("click", () => {
-            this.handleNewGMotif();
-        });
-        const newSpacerEl = html_1.HTML.element("div", {
-            "class": "w3-button w3-border"
-        }, {}, ["New Spacer"]);
-        newSpacerEl.addEventListener("click", () => {
-            this.handleNewSpacer();
-        });
-        html_1.HTML.build({
-            p: container,
-            ch: [
-                {
-                    p: html_1.HTML.element("div", {}, {
-                        "display": "flex",
-                        "flex-direction": "column"
-                    }),
-                    ch: [nameListEl, newMotifEl, newGMotifEl, newSpacerEl]
-                },
-                html_1.HTML.element("div", {}, {
-                    "display": "flex",
-                    "flex-direction": "column"
-                }, [toolbarEl, elementEl])
-            ]
-        });
-        // setup name list
-        this.nameListViewer = new NameListViewer(nameListEl);
-        this.nameListViewer.bind(this);
-        // setup toolbar
-        const toolbar = new InspectorToolbar(toolbarEl);
-        toolbar.setData(["save", "reset", "delete"]);
-        toolbar.bind(this);
-        this.elementEditor = new ElementEditor_1.ElementEditor(elementEl);
-    }
-    handle(cmd) {
-        console.log("NSViewer", cmd);
-        if (typeof cmd === "string") {
-            switch (cmd) {
-                case "save": {
-                    const data = this.getData();
-                    const edata = this.elementEditor.getData();
-                    return this.send({
-                        kind: "redef",
-                        oldName: this.focus,
-                        newName: edata.name,
-                        def: edata.def
-                    });
+                else if (ch instanceof Node) {
+                    e.appendChild(ch);
                 }
-                case "reset": {
-                    const data = this.getData();
-                    return this.elementEditor.setData({
-                        name: this.focus,
-                        def: data[this.focus]
-                    });
-                }
-                case "delete": {
-                    return;
-                }
-                default: {
+                else {
+                    console.error("what's this?", ch);
                     throw new Error();
                 }
             }
         }
-        else {
-            // this.setData({
-            //     ns: this.getData().ns,
-            //     elem: cmd.name
-            // });
-            this.focus = cmd.name;
-            this.displayData(this.dom, this.data);
-        }
-    }
-    // displayData(container: HTMLElement, data: { ns: Namespace; elem: string; }): void {
-    displayData(container, data) {
-        const names = Object.keys(data).sort();
-        if (this.focus && data[this.focus]) {
-            this.nameListViewer.setData(names);
-            this.elementEditor.setData({
-                name: this.focus,
-                def: data[this.focus]
-            });
-        }
-        else {
-            this.nameListViewer.setData(names);
-        }
+        return e;
     }
 }
-exports.NamespaceViewer = NamespaceViewer;
+exports.createElement = createElement;
 
 
 /***/ }),
 
-/***/ "./src/SMDL/Utility.ts":
-/*!*****************************!*\
-  !*** ./src/SMDL/Utility.ts ***!
-  \*****************************/
+/***/ "./src/JSX/SVGFactory.ts":
+/*!*******************************!*\
+  !*** ./src/JSX/SVGFactory.ts ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+function createElement(tag, attr, ...children) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    if (attr) {
+        for (const k of Object.keys(attr)) {
+            if (k === "class") {
+                for (const cls of attr.class) {
+                    e.classList.add(cls);
+                }
+            }
+            else if (k === "style") {
+                const styleList = Object.keys(attr.style).map((k) => ({
+                    name: k,
+                    value: attr.style[k]
+                }));
+                const styleString = styleList.map((x) => (x.name + ":" + x.value + ";")).join("");
+                e.setAttribute("style", styleString);
+            }
+            else {
+                e.setAttribute(k, attr[k]);
+            }
+        }
+    }
+    if (children) {
+        for (const ch of children) {
+            if (typeof ch === "string" || typeof ch === "number") {
+                e.appendChild(document.createTextNode(ch + ""));
+            }
+            else if (ch instanceof SVGElement) {
+                e.appendChild(ch);
+            }
+            else {
+                console.log("???", ch);
+            }
+        }
+    }
+    return e;
+}
+exports.createElement = createElement;
+function render(container, ...children) {
+    container.innerHTML = "";
+    for (const ch of children) {
+        container.appendChild(ch);
+    }
+}
+exports.render = render;
+
+
+/***/ }),
+
+/***/ "./src/SSPDL/SSPDL.ts":
+/*!****************************!*\
+  !*** ./src/SSPDL/SSPDL.ts ***!
+  \****************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+;
+;
+;
+var ElementKind;
+(function (ElementKind) {
+    ElementKind["Motif"] = "motif";
+    ElementKind["GMotif"] = "g-motif";
+    ElementKind["Spacer"] = "spacer";
+})(ElementKind || (ElementKind = {}));
+exports.ElementKind = ElementKind;
+
+
+/***/ }),
+
+/***/ "./src/SSPDL/Utility.ts":
+/*!******************************!*\
+  !*** ./src/SSPDL/Utility.ts ***!
+  \******************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2585,109 +3320,32 @@ function transformModule(m, p) {
     });
 }
 exports.transformModule = transformModule;
+function tranverseModule(m, p) {
+    return m.map((t) => {
+        switch (t.kind) {
+            case "element": {
+                p(t);
+                return;
+            }
+            case "alternation": {
+                t.psubs.map((ps) => tranverseModule(ps.mod, p));
+                return;
+            }
+            case "repetition": {
+                tranverseModule(t.sub, p);
+                return;
+            }
+        }
+    });
+}
+exports.tranverseModule = tranverseModule;
 
 
 /***/ }),
 
-/***/ "./src/SpacerEditor.ts":
-/*!*****************************!*\
-  !*** ./src/SpacerEditor.ts ***!
-  \*****************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget/Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-const DistributionEditor_1 = __webpack_require__(/*! ./DistributionEditor */ "./src/DistributionEditor.ts");
-;
-class SpacerEditor extends Widget_1.Editor {
-    constructor(container) {
-        super(container);
-        const nameEdEl = html_1.HTML.box();
-        const distEdEl = html_1.HTML.box();
-        const distEd = new DistributionEditor_1.DistributionEditor(distEdEl);
-        this.distEd = distEd;
-        html_1.HTML.build({
-            p: container,
-            ch: [this.distEd.getDOM()]
-        });
-    }
-    displayData(container, data) {
-        this.distEd.setData(data.distribution);
-    }
-    getData() {
-        return {
-            distribution: this.distEd.getData()
-        };
-    }
-}
-exports.SpacerEditor = SpacerEditor;
-
-
-/***/ }),
-
-/***/ "./src/Widget/Button.ts":
-/*!******************************!*\
-  !*** ./src/Widget/Button.ts ***!
-  \******************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ../html */ "./src/html.ts");
-class ButtonBase extends Widget_1.Viewer {
-    init() {
-        super.init();
-        this.buttonEl = html_1.HTML.element("button", {}, {});
-        html_1.HTML.b({
-            p: this.getDOM(),
-            ch: [this.buttonEl]
-        });
-    }
-    displayData(container, data) {
-        html_1.HTML.b({
-            p: this.buttonEl,
-            ch: [data.label]
-        });
-    }
-}
-class Button extends Widget_1.$Controller(ButtonBase) {
-    init() {
-        super.init();
-        this.buttonEl.addEventListener("click", () => {
-            this.send({
-                kind: "button",
-                message: this.getData().message
-            });
-        });
-    }
-}
-exports.Button = Button;
-// class Button extends Viewer<ButtonData> implements Controller_<Cmd> {
-//     displayData(container: HTMLElement, data: ButtonData): void {
-//         const btn = HTML.element("button", {}, {}, [data.label]);
-//         btn.addEventListener("click", () => {
-//             this.send({
-//                 kind: "button",
-//                 message: data.message
-//             });
-//         });
-//         HTML.inner(container, [btn]);
-//     }
-// }
-
-
-/***/ }),
-
-/***/ "./src/Widget/ColorEditor.ts":
+/***/ "./src/SVGComponents/Box.tsx":
 /*!***********************************!*\
-  !*** ./src/Widget/ColorEditor.ts ***!
+  !*** ./src/SVGComponents/Box.tsx ***!
   \***********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
@@ -2695,32 +3353,74 @@ exports.Button = Button;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const html_1 = __webpack_require__(/*! ../html */ "./src/html.ts");
-const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.ts");
-class ColorEditor extends Widget_1.Editor {
-    constructor(container, label) {
-        super(container);
-        this.inputElement = html_1.HTML.element("input", {
-            "type": "color"
+const JSXFactory = __webpack_require__(/*! ../JSX/SVGFactory */ "./src/JSX/SVGFactory.ts");
+exports.Box = (prop) => {
+    return (JSXFactory.createElement("svg", { width: prop.size.toString(), height: prop.size.toString() },
+        JSXFactory.createElement("rect", { x: 1, y: 1, width: prop.size - 2, height: prop.size - 2, fill: prop.fill, stroke: prop.stroke })));
+};
+
+
+/***/ }),
+
+/***/ "./src/Widget/Button.tsx":
+/*!*******************************!*\
+  !*** ./src/Widget/Button.tsx ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+class Button extends Widget_1.Controller {
+    makeContainer() {
+        return JSXFactory.createElement("button", { style: { width: "100%" } });
+    }
+    displayData(data) {
+        const btn = this.getDOM();
+        btn.addEventListener("click", () => {
+            this.send({
+                kind: "button",
+                message: data.message
+            });
         });
+        JSXFactory.render(this.getDOM(), JSXFactory.createElement("span", null, data.label));
+    }
+}
+exports.Button = Button;
+
+
+/***/ }),
+
+/***/ "./src/Widget/ColorEditor.tsx":
+/*!************************************!*\
+  !*** ./src/Widget/ColorEditor.tsx ***!
+  \************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+class ColorEditor extends Widget_1.Editor {
+    makeContainer() {
+        return JSXFactory.createElement("input", { type: "color" });
+    }
+    init() {
+        super.init();
+        this.inputElement = this.getDOM();
         this.inputElement.addEventListener("change", () => {
             this.emitDataChange();
         });
-        label = label ? (label + ": ") : "";
-        html_1.HTML.build({
-            p: container,
-            ch: [
-                {
-                    p: html_1.HTML.element("label"),
-                    ch: [label, this.inputElement]
-                }
-            ]
-        });
     }
-    displayData(container, data) {
+    displayData(data) {
         this.inputElement.value = data;
     }
-    getData() {
+    getMajorData() {
         return this.inputElement.value;
     }
 }
@@ -2729,55 +3429,152 @@ exports.ColorEditor = ColorEditor;
 
 /***/ }),
 
-/***/ "./src/Widget/Pile.ts":
-/*!****************************!*\
-  !*** ./src/Widget/Pile.ts ***!
-  \****************************/
+/***/ "./src/Widget/Menubar.tsx":
+/*!********************************!*\
+  !*** ./src/Widget/Menubar.tsx ***!
+  \********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ../html */ "./src/html.ts");
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+class Menubar extends Widget_1.Controller {
+    makeContainer() {
+        return (JSXFactory.createElement("div", { style: {
+                display: "flex",
+                "flex-direction": "row",
+                "padding": "0",
+                "margin": "0",
+                "width": "100%",
+                "background-color": "lightgrey"
+            } }));
+    }
+    displayData(data) {
+        const Button = (prop) => {
+            // const btn = (
+            //     <div style={{
+            //         "display": "block",
+            //         "cursor": "pointer",
+            //         "padding": "0.2em 1em"
+            //     }}>{prop.secondLevel}</div>
+            // );
+            const btn = JSXFactory.createElement("button", null, prop.secondLevel);
+            btn.addEventListener("click", () => {
+                this.send({
+                    kind: "menubar",
+                    firstLevel: prop.firstLevel,
+                    secondLevel: prop.secondLevel
+                });
+            });
+            return btn;
+        };
+        const MenubarItem = (prop) => {
+            let dropdown;
+            const item = (JSXFactory.createElement("div", { style: { "display": "inline" } },
+                JSXFactory.createElement("div", { style: {
+                        "cursor": "pointer",
+                        "position": "relative",
+                        "padding-left": "1em",
+                        "padding-right": "1em",
+                        "padding-top": "0.2em",
+                        "padding-bottom": "0.2em",
+                        "background-color": "lightgrey"
+                    } }, prop.name),
+                dropdown = (JSXFactory.createElement("div", { style: {
+                        "flex-direction": "column",
+                        "position": "absolute",
+                        "display": "none",
+                        "background-color": "white",
+                        "box-shadow": "0px 8px 16px 0px rgba(0,0,0,0.2)"
+                    } }, prop.content.map((s) => (JSXFactory.createElement(Button, { firstLevel: prop.name, secondLevel: s })))))));
+            item.addEventListener("mouseenter", () => {
+                dropdown.style.display = "flex";
+            });
+            item.addEventListener("mouseleave", () => {
+                dropdown.style.display = "none";
+            });
+            return item;
+        };
+        const container = this.getDOM();
+        container.innerHTML = "";
+        for (const m of data) {
+            container.appendChild(JSXFactory.createElement(MenubarItem, { name: m.name, content: m.content }));
+        }
+    }
+}
+exports.Menubar = Menubar;
+
+
+/***/ }),
+
+/***/ "./src/Widget/NumberEditor.tsx":
+/*!*************************************!*\
+  !*** ./src/Widget/NumberEditor.tsx ***!
+  \*************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+class NumberEditor extends Widget_1.Editor {
+    makeContainer() {
+        return JSXFactory.createElement("input", { type: "number", step: 0 });
+    }
+    init() {
+        super.init();
+        this.inputElement = this.getDOM();
+        this.inputElement.addEventListener("change", () => {
+            this.emitDataChange();
+        });
+    }
+    displayData(data, minor) {
+        this.inputElement.value = data.toString();
+        if (minor.step !== undefined) {
+            this.inputElement.step = minor.step + "";
+        }
+        if (minor.min !== undefined) {
+            this.inputElement.min = minor.min + "";
+        }
+        if (minor.max !== undefined) {
+            this.inputElement.max = minor.max + "";
+        }
+    }
+    getMajorData() {
+        return parseFloat(this.inputElement.value);
+    }
+}
+exports.NumberEditor = NumberEditor;
+
+
+/***/ }),
+
+/***/ "./src/Widget/Pile.tsx":
+/*!*****************************!*\
+  !*** ./src/Widget/Pile.tsx ***!
+  \*****************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
 class Pile extends Widget_1.Frame {
     position(container, children) {
-        html_1.HTML.b({
-            p: container,
-            ch: [{
-                    p: {
-                        tag: "div",
-                        style: {
-                            "display": "flex",
-                            "flex-direction": "column"
-                        }
-                    },
-                    ch: children.map((c) => {
-                        return c.getDOM();
-                    })
-                }]
-        });
+        JSXFactory.render(container, (JSXFactory.createElement("div", { style: { "display": "flex", "flex-direction": "column" } }, children.map((ch) => (ch.getDOM())))));
     }
 }
 exports.Pile = Pile;
 class HPile extends Widget_1.Frame {
     position(container, children) {
-        html_1.HTML.b({
-            p: container,
-            ch: [{
-                    p: {
-                        tag: "div",
-                        style: {
-                            "display": "flex",
-                            "flex-direction": "row"
-                        }
-                    },
-                    ch: children.map((c) => {
-                        return c.getDOM();
-                    })
-                }]
-        });
+        JSXFactory.render(container, (JSXFactory.createElement("div", { style: { "display": "flex", "flex-direction": "row" } }, children.map((ch) => (ch.getDOM())))));
     }
 }
 exports.HPile = HPile;
@@ -2785,49 +3582,33 @@ exports.HPile = HPile;
 
 /***/ }),
 
-/***/ "./src/Widget/StringEditor.ts":
-/*!************************************!*\
-  !*** ./src/Widget/StringEditor.ts ***!
-  \************************************/
+/***/ "./src/Widget/StringEditor.tsx":
+/*!*************************************!*\
+  !*** ./src/Widget/StringEditor.tsx ***!
+  \*************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.ts");
-const html_1 = __webpack_require__(/*! ../html */ "./src/html.ts");
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
 class StringEditor extends Widget_1.Editor {
-    constructor(...x) {
-        super(...x);
-        const container = this.getDOM();
-        this.inputElement = html_1.HTML.element("input", {
-            "type": "text"
-        });
-        this.labelTextElement = html_1.HTML.element("span");
-        html_1.HTML.build({
-            p: container,
-            ch: [{
-                    p: html_1.HTML.element("label"),
-                    ch: [this.labelTextElement, this.inputElement]
-                }]
-        });
+    makeContainer() {
+        return JSXFactory.createElement("input", { type: "text" });
     }
-    displayData(container, data) {
-        this.inputElement.addEventListener("change", () => {
+    init() {
+        super.init();
+        this.getDOM().addEventListener("change", () => {
             this.emitDataChange();
         });
-        if (typeof data === "string") {
-            html_1.HTML.inner(this.labelTextElement, []);
-            this.inputElement.value = data;
-        }
-        else {
-            html_1.HTML.inner(this.labelTextElement, [data.label + ": "]);
-            this.inputElement.value = data.content;
-        }
     }
-    getData() {
-        return this.inputElement.value;
+    displayData(data) {
+        this.getDOM().value = data;
+    }
+    getMajorData() {
+        return this.getDOM().value;
     }
 }
 exports.StringEditor = StringEditor;
@@ -2835,9 +3616,157 @@ exports.StringEditor = StringEditor;
 
 /***/ }),
 
-/***/ "./src/Widget/Utility.ts":
+/***/ "./src/Widget/StringViewer.tsx":
+/*!*************************************!*\
+  !*** ./src/Widget/StringViewer.tsx ***!
+  \*************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+class StringViewer extends Widget_1.Viewer {
+    displayData(data) {
+        JSXFactory.render(this.getDOM(), (JSXFactory.createElement("span", null, data)));
+    }
+}
+exports.StringViewer = StringViewer;
+
+
+/***/ }),
+
+/***/ "./src/Widget/Utility.tsx":
+/*!********************************!*\
+  !*** ./src/Widget/Utility.tsx ***!
+  \********************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const Pile_1 = __webpack_require__(/*! ./Pile */ "./src/Widget/Pile.tsx");
+const StringViewer_1 = __webpack_require__(/*! ./StringViewer */ "./src/Widget/StringViewer.tsx");
+;
+;
+function popup(widget, exits, handlers) {
+    const popupBox = (JSXFactory.createElement("div", { style: {
+            "position": "fixed",
+            "width": "100%",
+            "height": "100%",
+            "top": "0",
+            "left": "0",
+            "background-color": "rgba(100,100,100,0.5)",
+            "display": "flex",
+            "align-items": "center",
+            "justify-content": "center"
+        } },
+        JSXFactory.createElement("div", { style: {
+                "background-color": "white",
+                "border": "1px solid grey",
+                "padding": "1em",
+                "max-width": "100%",
+                "max-height": "100%",
+                "overflow": "auto",
+                "display": "flex",
+                "flex-direction": "column",
+                'align-items': 'center',
+                'box-shadow': '0px 0px 3px 3px grey'
+            } },
+            JSXFactory.createElement("div", null, widget.getDOM()),
+            JSXFactory.createElement("div", { style: {
+                    display: "flex",
+                    "margin-top": "1em",
+                    "flex-direction": "row",
+                    "justify-content": "flex-end",
+                    "width": '100%'
+                } }, exits.map((action) => {
+                const btn = JSXFactory.createElement("button", { style: { width: "10em", "margin-left": "1em" } }, action.label);
+                btn.addEventListener("click", () => {
+                    popupBox.remove();
+                    handlers[action.key]();
+                });
+                return btn;
+            })))));
+    document.body.appendChild(popupBox);
+    return (key) => {
+        popupBox.remove();
+        if (handlers[key]) {
+            handlers[key]();
+            return;
+        }
+        else {
+            console.error(key, handlers);
+            throw Error();
+        }
+    };
+}
+exports.popup = popup;
+function tell(widget, cypher = "OK") {
+    const exit = popup(widget, [
+        {
+            label: cypher,
+            key: "close"
+        }
+    ], {
+        "close": () => { }
+    });
+    return new class {
+        handle(cmd) {
+            exit("close");
+        }
+    };
+}
+exports.tell = tell;
+function ask(widget, handlers) {
+    const exit = popup(widget, [
+        {
+            label: JSXFactory.createElement("span", { style: { color: "green" } }, "Ok"),
+            key: "ok"
+        },
+        {
+            label: "Cancel",
+            key: "cancel"
+        }
+    ], handlers);
+    return new class {
+        handle(cmd) {
+            if (cmd.command === "ok") {
+                exit("ok");
+            }
+            else if (cmd.command === "cancel") {
+                exit("cancel");
+            }
+        }
+    };
+}
+exports.ask = ask;
+function simpleAsk(question, ed, success, fail) {
+    const vr = new StringViewer_1.StringViewer();
+    vr.initData(question);
+    const pile = new Pile_1.Pile();
+    pile.setChildren([vr, ed]);
+    ask(pile, {
+        ok: () => {
+            success(ed.getMajorData());
+        },
+        cancel: () => {
+            fail();
+        }
+    });
+}
+exports.simpleAsk = simpleAsk;
+
+
+/***/ }),
+
+/***/ "./src/Widget/Widget.tsx":
 /*!*******************************!*\
-  !*** ./src/Widget/Utility.ts ***!
+  !*** ./src/Widget/Widget.tsx ***!
   \*******************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
@@ -2845,132 +3774,14 @@ exports.StringEditor = StringEditor;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const html_1 = __webpack_require__(/*! ../html */ "./src/html.ts");
-function popup(widget, handlers) {
-    const box = html_1.HTML.b({
-        tag: "div",
-        style: {
-            "position": "fixed",
-            "width": "100%",
-            "height": "100%",
-            "top": "0",
-            "left": "0",
-            "background-color": "rgba(100,100,100,0.5)",
-            "display": "flex",
-            "align-items": "center",
-            "justify-content": "center"
-        },
-        ch: [
-            {
-                tag: "div",
-                style: {
-                    "background-color": "white",
-                    "border": "1px solid black",
-                    "padding": "1em"
-                },
-                ch: [widget.getDOM()]
-            }
-        ]
-    });
-    const close = () => {
-        html_1.HTML.body().removeChild(box);
-        handlers.onclose();
-    };
-    box.addEventListener("click", (e) => {
-        if (e.target === box) {
-            close();
-        }
-    });
-    html_1.HTML.body().appendChild(box);
-    return new (class {
-        handle(cmd) {
-            close();
-        }
-    });
-}
-exports.popup = popup;
-function confirm(widget, handlers) {
-    const okButton = html_1.HTML.e({
-        tag: "button",
-        attr: {
-            "type": "button"
-        },
-        style: {
-            "color": "green",
-            "width": "100%"
-        },
-        ch: ["OK"]
-    });
-    const box = html_1.HTML.b({
-        tag: "div",
-        style: {
-            "position": "fixed",
-            "width": "100%",
-            "height": "100%",
-            "top": "0",
-            "left": "0",
-            "background-color": "rgba(100,100,100,0.5)",
-            "display": "flex",
-            "align-items": "center",
-            "justify-content": "center"
-        },
-        ch: [
-            {
-                tag: "div",
-                style: {
-                    "background-color": "white",
-                    "border": "1px solid black",
-                    "padding": "1em"
-                },
-                ch: [
-                    widget.getDOM(),
-                    okButton
-                ]
-            }
-        ]
-    });
-    const remove = () => {
-        html_1.HTML.body().removeChild(box);
-    };
-    const close = () => {
-        remove();
-        handlers.cancel();
-    };
-    okButton.addEventListener("click", () => {
-        remove();
-        handlers.ok();
-    });
-    box.addEventListener("click", (e) => {
-        if (e.target === box) {
-            close();
-        }
-    });
-    html_1.HTML.body().appendChild(box);
-    return new (class {
-        handle(cmd) {
-            close();
-        }
-    });
-}
-exports.confirm = confirm;
-
-
-/***/ }),
-
-/***/ "./src/Widget/Widget.ts":
-/*!******************************!*\
-  !*** ./src/Widget/Widget.ts ***!
-  \******************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
+const JSXFactory = __webpack_require__(/*! ../JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
 class Widget {
-    constructor(root) {
-        this.dom = root || document.createElement("div");
+    constructor() {
+        this.dom = this.makeContainer();
         this.init();
+    }
+    makeContainer() {
+        return JSXFactory.createElement("div", null);
     }
     init() {
         // for those who want to initialize without overriding constructor procedure
@@ -2999,41 +3810,98 @@ class Viewer extends Widget {
         super(...arguments);
         this.dataSetted = false;
     }
-    setData(data) {
+    initData(data) {
         this.dataSetted = true;
         this.data = data;
-        this.displayData(this.dom, this.data);
+        this.display();
     }
     getData() {
         if (this.dataSetted) {
-            return JSON.parse(JSON.stringify(this.data));
+            return this.data;
         }
         else {
             throw new Error("tried getting data before initialization");
         }
     }
+    display() {
+        this.displayData(this.getData());
+    }
 }
 exports.Viewer = Viewer;
-class Editor extends Viewer {
+class Editor extends Widget {
     constructor() {
         super(...arguments);
+        /*
+         * Major Data: data editable by user input
+         * Minor Data: not editable
+         */
         this.dataChangeHandlers = new Set();
+        this.majorDataSetted = false;
+        this.minorDataSetted = false;
     }
-    registerHandler(handler) {
-        this.dataChangeHandlers.add(handler);
+    register(listener, handler) {
+        this.dataChangeHandlers.add((data, source) => {
+            if (source !== listener) {
+                handler(data);
+            }
+        });
     }
-    cancelHandler(handler) {
+    cancel(handler) {
         this.dataChangeHandlers.delete(handler);
     }
-    setData(data) {
-        super.setData(data);
-        this.emitDataChange();
-    }
-    emitDataChange() {
-        const data = this.getData();
+    emitDataChange(changeSource) {
+        const data = this.getMajorData();
+        changeSource = changeSource || this;
         for (const handler of this.dataChangeHandlers) {
-            handler(data);
+            handler(data, changeSource);
         }
+    }
+    initData(data, extra) {
+        this.majorDataSetted = true;
+        this.majorData = data;
+        this.minorData = extra;
+        this.minorDataSetted = true;
+        this.display();
+    }
+    updateMajorData(data, source) {
+        if (!this.majorDataSetted) {
+            debugger;
+            throw new Error("update data before initialization");
+        }
+        else {
+            this.majorData = data;
+            this.display();
+            this.emitDataChange(source || this);
+        }
+    }
+    updateMinorData(extra) {
+        if (!this.minorDataSetted) {
+            debugger;
+            throw new Error("update data before initialization");
+        }
+        else {
+            this.minorData = extra;
+            this.display();
+        }
+    }
+    getMajorData() {
+        if (this.majorDataSetted) {
+            return this.majorData;
+        }
+        else {
+            throw new Error("tried getting data before initialization");
+        }
+    }
+    getMinorData() {
+        if (this.minorDataSetted) {
+            return this.minorData;
+        }
+        else {
+            throw new Error("tried getting extra data before initialization");
+        }
+    }
+    display() {
+        this.displayData(this.majorData, this.minorData);
     }
 }
 exports.Editor = Editor;
@@ -3052,437 +3920,57 @@ class Controller extends Viewer {
     }
 }
 exports.Controller = Controller;
-// function $Controller<BaseClass extends Widget, Command>(W: classof<BaseClass>): classof<BaseClass & Controller_<Command>> {
-function $Controller(bcc) {
-    return class extends bcc {
-        constructor() {
-            super(...arguments);
-            this.eeSet = new Set();
-        }
-        bind(ee) {
-            this.eeSet.add(ee);
-        }
-        send(cmd) {
-            for (const ee of this.eeSet) {
-                ee.handle(cmd);
-            }
-        }
-    };
-}
-exports.$Controller = $Controller;
 
 
 /***/ }),
 
-/***/ "./src/html.ts":
-/*!*********************!*\
-  !*** ./src/html.ts ***!
-  \*********************/
+/***/ "./src/Widget/Wrapper.tsx":
+/*!********************************!*\
+  !*** ./src/Widget/Wrapper.tsx ***!
+  \********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const JSUtility_1 = __webpack_require__(/*! ./utility/JSUtility */ "./src/utility/JSUtility.ts");
-const svg_1 = __webpack_require__(/*! ./utility/svg */ "./src/utility/svg.ts");
-function buildChild(block) {
-    if (block instanceof Node) {
-        return block;
+const Widget_1 = __webpack_require__(/*! ./Widget */ "./src/Widget/Widget.tsx");
+class Wrapper extends Widget_1.Widget {
+    constructor(content) {
+        super();
+        this.content = content;
     }
-    else if (typeof block == "string") {
-        return HTML.text(block);
-    }
-    else {
-        const pEl = block.p;
-        for (const c of block.ch) {
-            pEl.appendChild(buildChild(c));
-        }
-        return pEl;
+    getDOM() {
+        return this.content;
     }
 }
-class HTML {
-    static body() {
-        return document.getElementsByTagName("body")[0];
-    }
-    static svg() {
-        return svg_1.SVG.svg();
-    }
-    static e(s) {
-        const tag = s.tag;
-        const attr = s.attr || {};
-        const style = s.style || {};
-        const ch = s.ch || [];
-        const elem = document.createElement(tag);
-        for (const key in attr) {
-            elem.setAttribute(key, attr[key]);
-        }
-        elem.setAttribute("style", HTML.style(style) + (elem.getAttribute("style") || ""));
-        elem.innerHTML = "";
-        for (const c of ch) {
-            elem.appendChild(HTML.b(c));
-        }
-        return elem;
-    }
-    static b(bb) {
-        function bChild(bb) {
-            if (bb instanceof Node) {
-                return bb;
-            }
-            else if (typeof bb == "string") {
-                return HTML.text(bb);
-            }
-            else if ("tag" in bb) {
-                return HTML.e(bb);
-            }
-            else if ("p" in bb) {
-                const p = bb.p;
-                const pEl = (p instanceof HTMLElement) ? p : HTML.e(p);
-                pEl.innerHTML = "";
-                for (const c of bb.ch) {
-                    pEl.appendChild(bChild(c));
-                }
-                return pEl;
-            }
-            else {
-                throw new Error();
-            }
-        }
-        if (typeof bb == "string") {
-            const spanEl = HTML.element("span");
-            spanEl.appendChild(HTML.text(bb));
-            return spanEl;
-        }
-        else if (bb instanceof HTMLElement) {
-            return bb;
-        }
-        else if (bb instanceof Node) {
-            const divEl = HTML.element("div");
-            divEl.appendChild(bb);
-            return divEl;
-        }
-        else if ("tag" in bb) {
-            return HTML.e(bb);
-        }
-        else if ("p" in bb) {
-            const p = bb.p;
-            const pEl = (p instanceof HTMLElement) ? p : HTML.e(p);
-            pEl.innerHTML = "";
-            for (const c of bb.ch) {
-                pEl.appendChild(bChild(c));
-            }
-            return pEl;
-        }
-        else {
-            throw new Error();
-        }
-    }
-    static box() {
-        return HTML.element("div");
-    }
-    static ref(id) {
-        const e = document.getElementById(id);
-        if (e === null) {
-            throw new Error(id + " is not defined");
-        }
-        else {
-            return e;
-        }
-    }
-    static style(s) {
-        return Object.keys(s).map((k) => JSUtility_1.format("%: %", k, s[k])).join("; ") + "; ";
-    }
-    static element(tag, attr = {}, style = {}, children = []) {
-        const e = document.createElement(tag);
-        for (const key in attr) {
-            e.setAttribute(key, attr[key]);
-        }
-        e.setAttribute("style", HTML.style(style) + (e.getAttribute("style") || ""));
-        e.innerHTML = "";
-        for (const c of children) {
-            e.appendChild(buildChild(c));
-        }
-        return e;
-    }
-    static inner(parent, children) {
-        HTML.build({
-            p: parent,
-            ch: children
-        });
-    }
-    static build(block) {
-        if (typeof block == "string") {
-            const spanEl = HTML.element("span");
-            spanEl.appendChild(HTML.text(block));
-            return spanEl;
-        }
-        else if (block instanceof HTMLElement) {
-            return block;
-        }
-        else if (block instanceof Node) {
-            const divEl = HTML.element("div");
-            divEl.appendChild(block);
-            return divEl;
-        }
-        else {
-            const pEl = block.p;
-            pEl.innerHTML = "";
-            for (const c of block.ch) {
-                pEl.appendChild(buildChild(c));
-            }
-            return pEl;
-        }
-    }
-    static text(content) {
-        return document.createTextNode(content);
-    }
-    static span(content, style = {}) {
-        return HTML.e({
-            tag: "span",
-            style: style,
-            ch: [content]
-        });
-    }
-    static group(x) {
-        // TODO
-        return HTML.element("div");
-    }
-}
-exports.HTML = HTML;
-;
+exports.Wrapper = Wrapper;
 
 
 /***/ }),
 
-/***/ "./src/index.ts":
-/*!**********************!*\
-  !*** ./src/index.ts ***!
-  \**********************/
+/***/ "./src/index.tsx":
+/*!***********************!*\
+  !*** ./src/index.tsx ***!
+  \***********************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const ModelEditor_1 = __webpack_require__(/*! ./ModelEditor */ "./src/ModelEditor.ts");
-const html_1 = __webpack_require__(/*! ./html */ "./src/html.ts");
-// requestResource("GET", "./etc/sample_module.json", "json", (mod: Model) => {
-//     const editor = new ModelEditor(HTML.ref("main"));
-//     editor.setData(mod);
-// });
-const editor = new ModelEditor_1.ModelEditor(html_1.HTML.ref("main"));
-editor.setData({
+const ModelEditor_1 = __webpack_require__(/*! ./Components/ModelEditor */ "./src/Components/ModelEditor.tsx");
+const JSXFactory = __webpack_require__(/*! ./JSX/HTMLFactory */ "./src/JSX/HTMLFactory.ts");
+const e = JSXFactory.createElement("div", null);
+const editor = new ModelEditor_1.ModelEditor();
+editor.initData({
+    alphabet: ["A", 'C', 'G', 'T'],
     namespace: {},
+    background: { "A": 0.25, 'C': 0.25, 'G': 0.25, 'T': 0.25 },
     root: []
-});
-// animation example
-// const s = Snap("#example");
-// const c = s.circle(50, 50, 30);
-// c.drag(
-//     (dx, dy, x, y, e)=>{
-//         const elem = Snap.getElementByPoint(x, y);
-//         if (elem !== c) {
-//             elem.animate({
-//                 "r": 60
-//             }, 100);
-//         }
-//         console.log("move");
-//     },
-//     (x, y, e)=>{
-//         console.log("started");
-//     },
-//     (e) => {
-//         console.log(e);
-//     }
-// );
-// const c1 = s.circle(150, 50, 30);
-// c1.mouseout((e)=>{
-//     c1.animate({
-//         "r": 30
-//     }, 100);
-// })
-
-
-/***/ }),
-
-/***/ "./src/utility/JSUtility.ts":
-/*!**********************************!*\
-  !*** ./src/utility/JSUtility.ts ***!
-  \**********************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const sum = (...nums) => {
-    let s = 0;
-    for (let n of nums) {
-        s += n;
-    }
-    return s;
-};
-exports.sum = sum;
-const max = Math.max;
-exports.max = max;
-const min = Math.min;
-exports.min = min;
-const maxof = (a) => max(...a);
-exports.maxof = maxof;
-const minof = (a) => min(...a);
-exports.minof = minof;
-const format = (temp, ...fill) => {
-    let result = "";
-    let i = 0;
-    let j = 0;
-    while (i < temp.length) {
-        if (temp[i] == "%") {
-            result += fill[j];
-            j++;
-            i++;
-        }
-        else {
-            result += temp[i];
-            i++;
-        }
-    }
-    return result;
-};
-exports.format = format;
-const later = (p) => {
-    setTimeout(p, 100);
-};
-exports.later = later;
-function assert(condition, message) {
-    if (!condition) {
-        message = message || "Assertion failed";
-        if (typeof Error !== "undefined") {
-            throw new Error(message);
-        }
-        throw message; // Fallback
-    }
-}
-exports.assert = assert;
-function dummy() {
-    return;
-}
-exports.dummy = dummy;
-function equal(a, b) {
-    return JSON.stringify(a) === JSON.stringify(b);
-}
-exports.equal = equal;
-function enumerate(ls) {
-    const items = [];
-    for (const [i, x] of Array.from(ls).entries()) {
-        items.push({
-            i: i,
-            x: x
-        });
-    }
-    ;
-    return items;
-}
-exports.enumerate = enumerate;
-function zip2(ls0, ls1) {
-    const lim = min(ls0.length, ls1.length);
-    const ls = [];
-    for (let i = 0; i < lim; i++) {
-        ls.push([ls0[i], ls1[i]]);
-    }
-    return ls;
-}
-exports.zip2 = zip2;
-function zip(...ls) {
-    if (ls.length === 0) {
-        return [];
-    }
-    else {
-        const ls1 = ls[0];
-        const r = [];
-        for (let i = 0; i < ls1.length; i++) {
-            if (ls.every((l) => i < l.length)) {
-                r.push(ls.map(x => x[i]));
-            }
-            else {
-                break;
-            }
-        }
-        return r;
-    }
-}
-exports.zip = zip;
-function requestFile(callback) {
-    const inputElement = document.createElement("input");
-    inputElement.setAttribute("type", "file");
-    inputElement.addEventListener("change", () => {
-        const fileList = inputElement.files;
-        callback(fileList ? fileList[0] : null);
-    });
-    inputElement.click();
-}
-exports.requestFile = requestFile;
-
-
-/***/ }),
-
-/***/ "./src/utility/svg.ts":
-/*!****************************!*\
-  !*** ./src/utility/svg.ts ***!
-  \****************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var SVG;
-(function (SVG) {
-    SVG.namespace = "http://www.w3.org/2000/svg";
-    function elem(tag, as = {}) {
-        const e = document.createElementNS(SVG.namespace, tag);
-        attr(e, as);
-        return e;
-    }
-    SVG.elem = elem;
-    function attr(e, as) {
-        for (const key of Object.keys(as)) {
-            e.setAttributeNS("", key, as[key] + "");
-        }
-        return;
-    }
-    SVG.attr = attr;
-    function svg(attr = {}) {
-        return elem("svg", attr);
-    }
-    SVG.svg = svg;
-    function build(n) {
-        if (n instanceof SVGElement) {
-            return n;
-        }
-        else if (typeof n === "string" || typeof n === "number") {
-            const e = elem("tspan");
-            e.appendChild(document.createTextNode(n + ""));
-            return e;
-        }
-        else if ("tag" in n) {
-            return elem(n.tag, n.attr || {});
-        }
-        else if ("p" in n) {
-            const p = build(n.p);
-            p.innerHTML = "";
-            for (const c of n.ch) {
-                p.appendChild(build(c));
-            }
-            return p;
-        }
-        else {
-            // n is never;
-            console.log(n);
-            throw new Error(n);
-        }
-    }
-    SVG.build = build;
-})(SVG = exports.SVG || (exports.SVG = {}));
+}, undefined);
+document.body.appendChild(editor.getDOM());
+document.body.style.padding = "0";
 
 
 /***/ }),
@@ -3497,7 +3985,7 @@ var SVG;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-const JSUtility_1 = __webpack_require__(/*! ./utility/JSUtility */ "./src/utility/JSUtility.ts");
+const JSUtility_1 = __webpack_require__(/*! ./JSUtility */ "./src/JSUtility.ts");
 const Snap = __webpack_require__(/*! snapsvg */ "snapsvg");
 function registerHandlers(paper, handlerGroup) {
     let lastElement = null;
@@ -3554,20 +4042,22 @@ function InternalBox(paper, pathString, x, y, radius, handlerGroup) {
     registerHandlers(paper, handlerGroup);
 }
 exports.InternalBox = InternalBox;
-function SpacerBox(paper, label, pathString, width, height, handlerGroup) {
+function SpacerBox(paper, label, pathString, x, y, width, height, handlerGroup) {
     paper = paper.g();
-    const r = paper.rect(0, 0, width, height).attr({
+    const r = paper.rect(x, y, width, height).attr({
         "stroke": "white",
         "fill": "white",
         "smdl-path": pathString
     });
-    const p = paper.path(Snap.format("M0,0 V{h} M{w},0 V{h}", {
-        "w": width,
-        "h": height
+    const p = paper.path(Snap.format("M{x1},{y} V{h} M{x2},{y} V{h}", {
+        "x1": x,
+        "x2": x + width,
+        "y": y,
+        "h": y + height
     })).attr({
         "pointer-events": "none"
     });
-    paper.text(width / 2, height / 2, label).attr({
+    paper.text(x + width / 2, y + height / 2, label).attr({
         "stroke": "black",
         "fill": "black",
         "text-anchor": "middle",
@@ -3587,26 +4077,30 @@ function SpacerBox(paper, label, pathString, width, height, handlerGroup) {
     });
 }
 exports.SpacerBox = SpacerBox;
-function PWMBox(paper, label, color, pathString, width, height, handlerGroup) {
-    function bgdColorToLabelColor(color) {
+function PWMBox(paper, label, fillColor, pathString, x, y, width, height, handlerGroup) {
+    function fillToStroke(color) {
         const clr = Snap.color(color);
         const lightness = clr.l;
         return (lightness < 0.5) ? "white" : "black";
     }
     paper = paper.g();
+    paper.transform(Snap.format("translate({x},{y})", {
+        "x": x,
+        "y": y
+    }));
+    const strokeColor = fillToStroke(fillColor);
     const r = paper.rect(0, 0, width, height, JSUtility_1.min(width / 3, height / 3)).attr({
-        "stroke": "none",
-        "fill": color,
+        "stroke": strokeColor,
+        "fill": fillColor,
         "smdl-path": pathString
     });
-    const labelColor = bgdColorToLabelColor(color);
     paper.text(width / 2, height / 2, label).attr({
-        "stroke": labelColor,
-        "fill": labelColor,
+        "stroke": strokeColor,
+        "fill": strokeColor,
         "text-anchor": "middle",
         "dominant-baseline": "central",
         "pointer-events": "none",
-        "font-size": height * 0.6
+        "font-size": height * 0.5 + "px"
     });
     registerHandlers(paper, handlerGroup);
     r.hover(() => {
@@ -3615,7 +4109,7 @@ function PWMBox(paper, label, color, pathString, width, height, handlerGroup) {
         });
     }, () => {
         r.attr({
-            "stroke": "none"
+            "stroke": strokeColor
         });
     });
 }
