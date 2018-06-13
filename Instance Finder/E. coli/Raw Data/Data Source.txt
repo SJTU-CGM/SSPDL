@@ -1,0 +1,14 @@
+[Codon Usage]
+https://openwetware.org/wiki/Escherichia_coli/Codon_usage
+
+[FASTA, GenBank]
+https://www.ncbi.nlm.nih.gov/nuccore/NC_000913.3
+
+[GC Content]
+http://bionumbers.hms.harvard.edu/bionumber.aspx?&id=100528&ver=3
+
+[RBS Matrix]
+https://www.sciencedirect.com/science/article/pii/S0022283601950405
+
+[RBS-IP Dist.]
+https://www.sciencedirect.com/science/article/pii/S0022283601950405
