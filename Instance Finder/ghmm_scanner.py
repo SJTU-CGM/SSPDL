@@ -201,6 +201,9 @@ class ProgressPrinter:
             print(bs + ws + bs + message, end="", file=sys.stderr)
             self.message_length = len(message)
 
+    def clean(self):
+        self.print("")
+
 
 TransitionTable = Dict[State, Dict[Interval, Dict[str, Tuple[float, Hook, State]]]]
 
@@ -242,68 +245,55 @@ def make_transiton_table(model: Model):
 from logger import Logger
 
 
+def print_comment(s):
+    print("# " + s, file=sys.stderr)
+
+
+def display_model(model: Model):
+    print_comment("The graph of input model, each line corresponds to an edge")
+    print_comment("<From>--(<Probability>, <Label>)--><To>")
+    print_comment("Labels displayed as '[<X>, <Y>]' is a spacer whose length ranges between X and Y.")
+    print_comment("Labels displayed as '<<S>>' is a PWM whose name is S.")
+    print(model.graph, file=sys.stderr)
+    print(file=sys.stderr)
+
+
 def scan_model(model: Model, pv_dict, top: float, sequence: Sequence):
     # import time
     printer = ProgressPrinter()
 
-    print(model.graph, file=sys.stderr)
-    print(file=sys.stderr)
+    display_model(model)
 
     pool: List[Matcher] = []
     logger = Logger(top)
     init_table = make_init_table(model)
     alive_table = make_alive_table(model)
     transition_table = make_transiton_table(model)
-    # printer.print("progress: {:.4f} {: 4}".format(0, len(pool)))
-
-    # t_end = time.clock()
 
     for pwm_match in get_pwm_matches(model.pwm_dict, pv_dict, model.bgd, sequence):
-
-        # t0 = time.clock()
-
         new_pool = []
         for matcher in get_init_matchers(init_table, pwm_match):
             new_pool.append(matcher)
-
-        # t1 = time.clock()
-
         for matcher in get_child_matchers(pool, pwm_match, transition_table):
             new_pool.append(matcher)
-
-        # t2 = time.clock()
-
         # filter
         new_pool = veterbi_filter(new_pool)
-
-        # t3 = time.clock()
-
         # log newly generated matchers
         for matcher in new_pool:
             if matcher.state in model.ends:
                 logger.put(make_match_result(matcher))
-
-        # t4 = time.clock()
-
         # add alive old matchers to new pool
         for matcher in get_alive_matchers(alive_table, pool, pwm_match):
             new_pool.append(matcher)
-
-        # t5 = time.clock()
-
         pool = new_pool
         assert len(pool) < 10000, "out of memory, scan to {} so far.".format(pwm_match.start)
-
-        # ts = [t_end, t0, t1, t2, t3, t4, t5]
-        # ts = [t_end, t0, t5]
-        # timing = "; ".join(map("{:.4f}".format, map(lambda x, y: y - x, ts[:-1], ts[1:])))
+        # display progress
         import statistics
-        progress = f"{pwm_match.start: 6}/{len(sequence): 6} base"
-        stat = f"#matcher {len(pool):3} #mean {statistics.mean(len(m.get_history()) for m in pool) if len(pool) > 0 else 0:8.2f}"
-        printer.print(f"{progress}; {stat}; ")
-        # t_end = time.clock()
-
+        progress = f"Scanned {pwm_match.start: 6}/{len(sequence): 6} nt"
+        stat_count = f"# of ongoing matcher: {len(pool):3}"
+        printer.print(f"{progress}; {stat_count};")
     printer.print("Preparing the match result.")
+    printer.clean()
     yield from logger.get_results()
 
 

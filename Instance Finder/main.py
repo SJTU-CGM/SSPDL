@@ -4,7 +4,7 @@
 import json
 
 from _5_D_model import Model
-from ghmm_scanner import scan_model, PWMMatch, ModelMatch, HookMatch
+from ghmm_scanner import scan_model, ModelMatch, HookMatch
 
 
 class AppParameter:
@@ -20,12 +20,18 @@ class AppParameter:
 def get_args():
     import argparse
     parser = argparse.ArgumentParser(description="Search for model instances in given sequence file.")
-    parser.add_argument('--model_path', required=True)
-    parser.add_argument('--alpha_path', required=False)
-    parser.add_argument('--alpha', type=float, default=0.05)
-    parser.add_argument('--top', required=True, type=float, default=float('+inf'))
-    parser.add_argument('--pwm', action='store_true')
-    parser.add_argument('fasta_paths', metavar="FILE", nargs='+')
+    parser.add_argument('model_path', metavar='MODEL_PATH',
+                        help="path to the model file")
+    parser.add_argument('--top', type=float, default=float('+inf'),
+                        help="(default: '+inf') only output the top X model instances, sorted by their scores")
+    parser.add_argument('--alpha', type=float, default=0.05,
+                        help="(default: 0.05) alpha value for a sequence to be viewed as a true pwm match ")
+    parser.add_argument('--pwm', action='store_true',
+                        help="(advanced) just find and print instances of involved pwm(s)")
+    parser.add_argument('--alpha_path', required=False,
+                        help="(advanced) path to a file specifying alpha value(s)")
+    parser.add_argument('fasta_paths', metavar="SEQUENCE_PATH", nargs='+',
+                        help="where to find the model instances")
     args = parser.parse_args()
     try:
         return AppParameter(model_path=args.model_path,
