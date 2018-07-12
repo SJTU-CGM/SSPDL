@@ -1,27 +1,33 @@
-# Motif-Scanner
-A Python library for scanning matches of a sequence motif.
+# Instance Finder
+
+Given a sequence file and a model file, find matches of model.
 
 ## Usage
-```python
-from motif_scanner import MotifScanner
 
-
-scanner = MotifScanner("GAACGTCCCTGCCGTATTATTGTTTTTATAGG")
-# background distribution
-background = {
-    "A": 0.25,
-    "C": 0.25,
-    "G": 0.25,
-    "T": 0.25
-}
-# Position-specific Distribution Matrix
-psdm = [
-    {'A': 0.1, 'C': 0.1, 'G': 0.1, 'T': 0.7},
-    {'A': 0.7, 'C': 0.1, 'G': 0.1, 'T': 0.1},
-    {'A': 0.1, 'C': 0.1, 'G': 0.1, 'T': 0.7},
-    {'A': 0.7, 'C': 0.1, 'G': 0.1, 'T': 0.1}
-]
-for p_value, position, piece in scanner.scan(p_value=0.05, background=background, psdm=psdm):
-    # do something with p_value, position, piece, for example:
-    print(p_value, position, piece)
 ```
+./main.py -h
+usage: main.py [-h] [--top TOP] [--alpha ALPHA] [--pwm]
+               [--alpha_path ALPHA_PATH]
+               MODEL_PATH SEQUENCE_PATH [SEQUENCE_PATH ...]
+
+Search for model instances in given sequence file.
+
+positional arguments:
+  MODEL_PATH            path to the model file
+  SEQUENCE_PATH         where to find the model instances
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --top TOP             (default: '+inf') only output the top X model
+                        instances, sorted by their scores
+  --alpha ALPHA         (default: 0.05) alpha value for a sequence to be
+                        viewed as a true pwm match
+  --pwm                 (advanced) just find and print instances of involved
+                        pwm(s)
+  --alpha_path ALPHA_PATH
+                        (advanced) path to a file specifying alpha value(s)
+```
+
+# Prerequisites
+
+Biopython
