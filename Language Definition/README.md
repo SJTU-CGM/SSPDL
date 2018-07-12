@@ -1,3 +1,3 @@
-# About this directory
+# Language Definition
 
-This directory contains the type definitions (in Typescript syntax) of elements of SSPDL.
+The definition of sequence pattern, in TypeScript form.
